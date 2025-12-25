@@ -18,8 +18,11 @@ router = APIRouter(
     tags=["AI Services"],
 )
 
-# Initialize unified product AI service (使用单例模式)
-product_ai_service = ProductAIService.get_instance()
+# 延迟初始化：不在模块级别初始化，避免在 Nacos 连接之前触发
+# product_ai_service 将在第一次调用时通过 get_product_ai_service() 获取
+def get_product_ai_service() -> ProductAIService:
+    """获取 ProductAIService 单例实例（延迟初始化）."""
+    return ProductAIService.get_instance()
 
 
 @router.post(
@@ -47,7 +50,8 @@ async def check_title(
             extra={"title": request.title[:50]},
         )
 
-        response = await product_ai_service.check_title(request)
+        service = get_product_ai_service()
+        response = await service.check_title(request)
 
         return ResultContext.success(data=response, message="标题检查完成")
 
@@ -84,7 +88,8 @@ async def check_image(
             extra={"image_url": request.imageUrl[:100]},
         )
 
-        response = await product_ai_service.check_image(request)
+        service = get_product_ai_service()
+        response = await service.check_image(request)
 
         return ResultContext.success(data=response, message="图片检查完成")
 
@@ -125,7 +130,8 @@ async def generate_description(
             },
         )
 
-        response = await product_ai_service.generate_description(request)
+        service = get_product_ai_service()
+        response = await service.generate_description(request)
 
         return ResultContext.success(
             data=response, message="商品描述生成完成"

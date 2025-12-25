@@ -1,10 +1,13 @@
 """Application settings and configuration management."""
 
-from functools import lru_cache
 from typing import Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from app.utils.ip import get_local_ip
+
+# 模块级别的单例实例（避免与 Pydantic 字段系统冲突）
+_settings_instance: Optional["Settings"] = None
 
 
 class Settings(BaseSettings):
@@ -53,6 +56,9 @@ class Settings(BaseSettings):
     service_name: str = Field(
         default="ai-service",
         description="Service name for registration",
+    )
+    service_ip: str = Field(
+        default_factory=get_local_ip, description="Service IP"
     )
     service_port: int = Field(
         default=8000,
@@ -135,6 +141,19 @@ class Settings(BaseSettings):
         description="LLM request timeout in seconds",
     )
 
+    @classmethod
+    def get_instance(cls) -> "Settings":
+        """
+        获取 Settings 单例实例.
+
+        Returns:
+            Settings 实例
+        """
+        global _settings_instance
+        if _settings_instance is None:
+            _settings_instance = cls()
+        return _settings_instance
+
     @property
     def postgres_url(self) -> str:
         """Build PostgreSQL connection URL."""
@@ -144,12 +163,11 @@ class Settings(BaseSettings):
         )
 
 
-@lru_cache
 def get_settings() -> Settings:
     """
-    加载 .env 中的配置，得到 settings 实例
+    获取 Settings 单例实例.
 
     Returns:
-        Settings instance
+        Settings 单例实例
     """
-    return Settings()
+    return Settings.get_instance()

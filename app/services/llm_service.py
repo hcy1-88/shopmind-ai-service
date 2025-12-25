@@ -53,7 +53,7 @@ class LLMService:
                 self.provider = OpenAIProvider(self._config.get("openai", {}))
 
             logger.info(
-                "LLM 服务初始化完毕",
+                "LLM provider 初始化完毕！",
                 extra={"provider": provider_name},
             )
 

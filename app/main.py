@@ -10,14 +10,14 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.config.nacos_client import get_nacos_client
-from app.db import close_db, init_db
+# from app.db import close_db, init_db
 from app.middleware.trace_middleware import TraceIDMiddleware
-from app.mq import close_rocketmq, init_rocketmq
+# from app.mq import close_rocketmq, init_rocketmq
 from app.routers import ai_router
 from app.schemas.result_context import ResultContext
 from app.utils.logger import app_logger as logger
 from app.utils.logger import setup_logger
-from app.vector_store import close_milvus, init_milvus
+# from app.vector_store import close_milvus, init_milvus
 
 
 @asynccontextmanager
@@ -28,15 +28,15 @@ async def lifespan(app: FastAPI):
     Handles startup and shutdown events.
     """
     # Startup
-    logger.info("Starting AI service...")
-
     try:
-        # Get settings
+        # Get settings first
         settings = get_settings()
 
-        # Setup logging
+        # Setup logging (必须在记录日志之前配置)
         log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
-        setup_logger(log_level)
+        setup_logger(level=log_level)  # 使用关键字参数确保正确传递 level
+        
+        logger.info("正在启动 Shopmind AI service...")
 
         # nacos 初始化
         nacos_client = get_nacos_client(settings)
@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
         # 初始化 LLM 服务
         from app.services.llm_service import get_llm_service
         llm_service = get_llm_service()
-        logger.info("LLM service initialized")
+        logger.info("LLM service 初始化成功！")
 
         # # 初始化 database
         # await init_db()
@@ -59,7 +59,7 @@ async def lifespan(app: FastAPI):
         # await init_rocketmq()
         # logger.info("RocketMQ initialized")
 
-        logger.info("AI service started successfully")
+        logger.info("Shopmind AI service 启动成功！")
 
     except Exception as e:
         logger.error(f"Failed to start AI service: {e}")

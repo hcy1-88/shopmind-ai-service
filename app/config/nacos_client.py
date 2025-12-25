@@ -8,13 +8,14 @@ from typing import Any, Optional
 from v2.nacos import ClientConfigBuilder, GRPCConfig, NacosConfigService, NacosNamingService, ClientConfig, ConfigParam, \
     RegisterInstanceParam, DeregisterInstanceParam
 
-from app.config.settings import Settings
+from app.config.settings import Settings, get_settings
 from app.utils.logger import app_logger as logger
-from app.utils.ip import get_local_ip
 
 
 class NacosClient:
     """Nacos client wrapper for service registration and configuration."""
+
+    _instance: Optional["NacosClient"] = None
 
     def __init__(self, settings: Settings):
         """
@@ -26,14 +27,14 @@ class NacosClient:
         self.settings: Settings = settings
         """nacos 配置信息"""
         self.addr: str = settings.nacos_server_addr
-        self.nacos_user: str = settings.nacos_server_username
-        self.nacos_password: str = settings.nacos_server_password
-        self.namespace: str = settings.nacos_server_namespace
-        self.data_id: str = settings.nacos_server_data_id
-        self.group: str = settings.nacos_server_group
+        self.nacos_user: str = settings.nacos_username or ""
+        self.nacos_password: str = settings.nacos_password or ""
+        self.namespace: str = settings.nacos_namespace
+        self.data_id: str = settings.nacos_data_id
+        self.group: str = settings.nacos_group
         self.log_level: str = settings.log_level
         self.service_name: str = settings.service_name
-        self.service_ip: str = get_local_ip()
+        self.service_ip: str = settings.service_ip
         self.service_port: int = settings.service_port
         self.service_cluster: str = settings.service_cluster
         self.service_metadata: dict = settings.service_metadata
@@ -43,6 +44,23 @@ class NacosClient:
         self.register_client: NacosNamingService | None = None
         self.config_from_nacos: dict[str, Any] | None = None
 
+    @classmethod
+    def get_instance(cls, settings: Optional[Settings] = None) -> "NacosClient":
+        """
+        获取 NacosClient 单例实例.
+
+        Args:
+            settings: 应用配置，如果为 None 则使用默认配置。
+                      仅在第一次调用时生效，后续调用会忽略此参数。
+
+        Returns:
+            NacosClient 单例实例
+        """
+        if cls._instance is None:
+            if settings is None:
+                settings = get_settings()
+            cls._instance = cls(settings=settings)
+        return cls._instance
 
     async def config_listener(self, tenant, data_id, group, content) -> None:
         """监听器：监听配置"""
@@ -104,6 +122,14 @@ class NacosClient:
         logger.info("Nacos 配置中心已连接！")
         # 转 yaml
         self.config_from_nacos = yaml.safe_load(content)
+        # 验证配置是否成功设置
+        if self.config_from_nacos is None:
+            logger.error(
+                "警告：Nacos 配置解析后为 None，将使用空字典",
+                extra={"content": content[:500] if content else "None"},
+            )
+            self.config_from_nacos = {}
+        logger.info("Nacos 配置获取如下：", extra={"config": self.config_from_nacos})
 
 
     async def init_register_center(self) -> None:
@@ -251,6 +277,13 @@ class NacosClient:
 
 def get_nacos_client(settings: Optional[Settings] = None) -> NacosClient:
     """
-    获取 nacos 客户端
+    获取 NacosClient 单例实例.
+
+    Args:
+        settings: 应用配置，如果为 None 则使用默认配置。
+                  仅在第一次调用时生效，后续调用会忽略此参数。
+
+    Returns:
+        NacosClient 单例实例
     """
-    return NacosClient(settings=settings)
+    return NacosClient.get_instance(settings=settings)

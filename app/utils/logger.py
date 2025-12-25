@@ -46,7 +46,9 @@ def setup_logger(name: str = APP_LOGGER_NAME, level: int = logging.INFO) -> logg
         logger.handlers.clear()
 
     # Console handler with JSON formatter
-    handler = logging.StreamHandler(sys.stdout)
+    # 使用 sys.stderr 而不是 sys.stdout，避免被 uvicorn 重定向
+    handler = logging.StreamHandler(sys.stderr)
+    # 确保 handler 的级别不高于 logger 的级别
     handler.setLevel(level)
 
     # 添加 traceId 过滤器
@@ -57,6 +59,7 @@ def setup_logger(name: str = APP_LOGGER_NAME, level: int = logging.INFO) -> logg
     formatter = json.JsonFormatter(
         "%(asctime)s %(name)s %(levelname)s %(message)s",
         timestamp=True,
+        json_ensure_ascii=False,
     )
     handler.setFormatter(formatter)
 
