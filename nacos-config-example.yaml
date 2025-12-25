@@ -1,0 +1,52 @@
+# Nacos 配置示例
+# Data ID: ai-service.yaml
+# Group: DEFAULT_GROUP
+# 配置格式: YAML
+
+# PostgreSQL 数据库配置
+postgresql:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: your-postgres-password
+  database: shopmind
+  pool_size: 10
+  max_overflow: 20
+
+# Milvus 向量数据库配置
+milvus:
+  host: localhost
+  port: 19530
+  user: null  # 如果没有设置用户名密码，设为 null
+  password: null
+  db_name: default
+
+# RocketMQ 消息队列配置
+rocketmq:
+  namesrv_addr: 127.0.0.1:9876
+  access_key: null  # 如果没有开启认证，设为 null
+  secret_key: null
+  group_id: ai-service-group
+
+# LLM 大语言模型配置
+llm:
+  # 提供商: openai, tongyi (通义千问)
+  provider: openai
+
+  # OpenAI 配置
+  openai:
+    api_key: sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    api_base: null  # 可选，使用代理或自定义端点时设置
+    model: gpt-4o-mini  # 文本生成模型
+    vision_model: gpt-4o  # 视觉理解模型
+
+  # 通义千问配置 (预留，暂未完全实现)
+  tongyi:
+    api_key: your-tongyi-api-key
+    model: qwen-max
+    vision_model: qwen-vl-max
+
+  # 通用 LLM 参数
+  temperature: 0.7  # 温度参数，控制随机性 (0-1)
+  max_tokens: 2000  # 最大生成 token 数
+  timeout: 60  # 请求超时时间（秒）

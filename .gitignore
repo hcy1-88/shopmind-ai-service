@@ -8,5 +8,39 @@ wheels/
 
 # Virtual environments
 .venv
-.vscode
-.cursor
+venv/
+env/
+
+# IDE
+.vscode/
+.cursor/
+.claude/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment variables
+.env
+.env.local
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite
+
+# OS
+.DS_Store
+Thumbs.db
+
+# uv
+.uv/
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+uv.lock
