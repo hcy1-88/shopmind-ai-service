@@ -32,3 +32,4 @@ if __name__ == "__main__":
     )
 
 # 启动命令：在项目根目录，输入 uv run python run.py
+# swagger API 文档：http://ip:8085/docs

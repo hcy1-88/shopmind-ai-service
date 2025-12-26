@@ -63,7 +63,7 @@ class ResultContext(BaseModel, Generic[T]):
     # ==================== 静态工厂方法 ====================
 
     @staticmethod
-    def success(
+    def ok(
         data: Optional[T] = None,
         message: str = "操作成功",
         trace_id: Optional[str] = None,

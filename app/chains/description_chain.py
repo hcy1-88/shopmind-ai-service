@@ -1,5 +1,5 @@
 """LangChain chain for product description generation."""
-
+import asyncio
 import base64
 from typing import Optional
 
@@ -8,6 +8,7 @@ from langchain_core.messages import HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
 
 from app.services.llm_service import get_llm_service
+from app.utils.image_util import load_image_from_url
 from app.utils.logger import app_logger as logger
 
 
@@ -56,81 +57,70 @@ class DescriptionGenerationChain:
             cls._instance = cls()
         return cls._instance
 
-    async def _load_image_from_url(self, url: str) -> str:
-        """
-        Load image from URL and convert to base64.
-
-        Args:
-            url: Image URL
-
-        Returns:
-            Base64 encoded image
-        """
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            return base64.b64encode(response.content).decode("utf-8")
-
     async def generate_with_images(
-        self,
-        title: str,
-        category: str,
-        image_urls: list[str],
+            self,
+            title: str,
+            category: str,
+            image_urls: list[str],
     ) -> str:
         """
-        根据图片获取商品描述.
+        根据多张图片获取商品描述（支持多图输入）。
 
         Args:
             title: 商品标题
             category: 商品的类目
-            image_urls: 商品图片的 URL 列表
+            image_urls: 商品图片的 URL 列表（建议 1~5 张）
 
         Returns:
             商品描述
         """
+        if not image_urls:
+            logger.warning("没有图片，回退到纯文本生成！")
+            return await self.generate_text_only(title, category)
+
         try:
             # 获取视觉模型
             vision_model = self.llm_service.get_vision_model()
 
-            # 准备图片内容（使用第一张图片）
-            image_url = image_urls[0]
-            image_base64 = await self._load_image_from_url(image_url)
+            # 并发加载所有图片为 base64（提升性能）
+            tasks = [load_image_from_url(url) for url in image_urls]
+            image_base64_list = await asyncio.gather(*tasks)
 
-            # 提示词
-            message = HumanMessage(
-                content=[
-                    {
-                        "type": "text",
-                        "text": f"""你是一个专业的电商文案撰写专家。请根据以下信息生成吸引人的商品描述：
+            # 构建 content：先文本，再所有图片
+            content = [
+                {
+                    "type": "text",
+                    "text": f"""你是一个专业的电商文案撰写专家。请根据以下信息生成吸引人的商品描述：
 
-商品标题：{title}
-商品类目：{category}
+    商品标题：{title}
+    商品类目：{category}
 
-文案要求：
-1. 仔细分析商品图片，提取商品的视觉特点
-2. 突出商品的核心卖点和特色
-3. 使用生动、吸引人的语言
-4. 符合电商规范，避免虚假宣传
-5. 长度控制在100-300字之间
-6. 结构清晰，易于阅读
+    文案要求：
+    1. 仔细分析所有提供的商品图片（包括主图、细节、场景等），提取商品的视觉特点
+    2. 突出商品的核心卖点和特色
+    3. 使用生动、吸引人的语言
+    4. 符合电商规范，避免虚假宣传
+    5. 长度控制在100-300字之间
+    6. 结构清晰，易于阅读
 
-请直接返回生成的商品描述文本。""",
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{image_base64}",
-                        },
-                    },
-                ],
-            )
+    请直接返回生成的商品描述文本。""",
+                }
+            ]
 
-            # 运行视觉模型
+            for base64_str in image_base64_list:
+                content.append({
+                    "type": "image_url",
+                    "image_url": {"url": base64_str},
+                })
+
+            message = HumanMessage(content=content)
+
+            # 调用模型
             response = await vision_model.ainvoke([message])
             description = response.content.strip()
 
             logger.info(
-                "Description generated with images",
+                "使用多张图片生成商品描述",
                 extra={
                     "title": title[:50],
                     "image_count": len(image_urls),
@@ -140,13 +130,13 @@ class DescriptionGenerationChain:
             return description
 
         except Exception as e:
-            logger.error(f"Error generating description with images: {e}")
-            # Fall back to text-only generation
+            logger.error(f"使用图片生成商品描述失败: {e}", exc_info=True)
+            # 回退到纯文本生成
             return await self.generate_text_only(title, category)
 
     async def generate_text_only(self, title: str, category: str) -> str:
         """
-        不使用图片分析获取商品描述.
+        不使用图片仅凭文本分析获取商品描述.
 
         Args:
             title: 商品标题

@@ -166,7 +166,7 @@ app.include_router(ai_router.router)
 @app.get("/", tags=["Root"], response_model=ResultContext[dict])
 async def root() -> ResultContext[dict]:
     """Root endpoint."""
-    return ResultContext.success(
+    return ResultContext.ok(
         data={
             "service": "shopmind-ai-service",
             "version": "0.1.0",
@@ -180,7 +180,7 @@ async def root() -> ResultContext[dict]:
 @app.get("/health", tags=["Health"], response_model=ResultContext[dict])
 async def health() -> ResultContext[dict]:
     """Health check endpoint."""
-    return ResultContext.success(
+    return ResultContext.ok(
         data={
             "status": "healthy",
             "service": "shopmind-ai-service",

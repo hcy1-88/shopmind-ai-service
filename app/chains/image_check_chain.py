@@ -1,16 +1,12 @@
 """LangChain chain for image compliance checking using vision models."""
-
-import base64
 from typing import Optional
-
-import httpx
 from langchain_core.messages import HumanMessage
 from langchain_core.output_parsers import JsonOutputParser
-
 from app.schemas.image_check import ImageCheckResponse
 from app.services.llm_service import get_llm_service
 from app.utils.logger import app_logger as logger
-
+from app.utils.image_util import is_base64_image, load_image_from_url
+import httpx
 
 class ImageCheckChain:
     """Chain for checking product image compliance using vision models."""
@@ -21,20 +17,6 @@ class ImageCheckChain:
         """Initialize image check chain."""
         self.llm_service = get_llm_service()
 
-    async def _load_image_from_url(self, url: str) -> str:
-        """
-        将图片 url 转换为 base64.
-
-        Args:
-            url: Image URL
-
-        Returns:
-            Base64 encoded image
-        """
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            return base64.b64encode(response.content).decode("utf-8")
 
     @classmethod
     def get_instance(cls) -> "ImageCheckChain":
@@ -48,17 +30,6 @@ class ImageCheckChain:
             cls._instance = cls()
         return cls._instance
 
-    def _is_base64_image(self, image_data: str) -> bool:
-        """
-        Check if the image data is base64 encoded.
-
-        Args:
-            image_data: Image data string
-
-        Returns:
-            True if base64, False otherwise
-        """
-        return not image_data.startswith(("http://", "https://"))
 
     async def check(self, image_url: str) -> dict:
         """
@@ -75,12 +46,12 @@ class ImageCheckChain:
             vision_model = self.llm_service.get_vision_model()
 
             # 准备图片
-            if self._is_base64_image(image_url):
+            if is_base64_image(image_url):
                 # Already base64
                 image_base64 = image_url
             else:
                 # 转 base64 from URL
-                image_base64 = await self._load_image_from_url(image_url)
+                image_base64 = await load_image_from_url(image_url)
 
             # Create message with image
             message = HumanMessage(
@@ -91,7 +62,7 @@ class ImageCheckChain:
 
 审核标准：
 1. 不能包含色情、暴力、血腥内容
-2. 不能包含政治敏感内容
+2. 不能包含政治敏感而引起对立的内容，但可使用"政府补贴"、"政府补助"、"消费补贴"、"以旧换新补贴"等营销表述
 3. 不能包含虚假宣传或误导性内容
 4. 不能包含恶意广告或水印
 5. 图片应清晰、真实地展示商品
@@ -107,7 +78,7 @@ class ImageCheckChain:
                     {
                         "type": "image_url",
                         "image_url": {
-                            "url": f"data:image/jpeg;base64,{image_base64}",
+                            "url": image_base64,
                         },
                     },
                 ],

@@ -53,7 +53,7 @@ async def check_title(
         service = get_product_ai_service()
         response = await service.check_title(request)
 
-        return ResultContext.success(data=response, message="标题检查完成")
+        return ResultContext.ok(data=response, message="标题检查完成")
 
     except Exception as e:
         logger.error(f"Error in title check endpoint: {e}")
@@ -66,21 +66,21 @@ async def check_title(
 @router.post(
     "/image-check",
     response_model=ResultContext[ImageCheckResponse],
-    summary="Check image compliance",
-    description="Check if product image complies with platform standards",
+    summary="检查图片合规性",
+    description="检查图片是否符合平台标准",
     status_code=status.HTTP_200_OK,
 )
 async def check_image(
     request: ImageCheckRequest,
 ) -> ResultContext[ImageCheckResponse]:
     """
-    Check product image compliance.
+    检查图片合规性
 
     Args:
-        request: Image check request containing the image URL
+        request: 请求体
 
     Returns:
-        ResultContext containing ImageCheckResponse with validation result
+        检查结果
     """
     try:
         logger.info(
@@ -91,7 +91,7 @@ async def check_image(
         service = get_product_ai_service()
         response = await service.check_image(request)
 
-        return ResultContext.success(data=response, message="图片检查完成")
+        return ResultContext.ok(data=response, message="图片检查完成")
 
     except Exception as e:
         logger.error(f"Error in image check endpoint: {e}")
@@ -104,21 +104,21 @@ async def check_image(
 @router.post(
     "/description-generate",
     response_model=ResultContext[DescriptionGenerateResponse],
-    summary="Generate product description",
-    description="Generate attractive product description based on title, images, and category",
+    summary="生成商品描述",
+    description="根据商品的标题、图片、分类 生成描述，图片可选",
     status_code=status.HTTP_200_OK,
 )
 async def generate_description(
     request: DescriptionGenerateRequest,
 ) -> ResultContext[DescriptionGenerateResponse]:
     """
-    Generate product description.
+    生成一段描述.
 
     Args:
-        request: Description generation request
+        request: 生成描述的请求体
 
     Returns:
-        ResultContext containing DescriptionGenerateResponse with generated description
+        检查结果
     """
     try:
         logger.info(
@@ -133,7 +133,7 @@ async def generate_description(
         service = get_product_ai_service()
         response = await service.generate_description(request)
 
-        return ResultContext.success(
+        return ResultContext.ok(
             data=response, message="商品描述生成完成"
         )
 
@@ -159,7 +159,7 @@ async def health_check() -> ResultContext[dict]:
     Returns:
         ResultContext containing health status
     """
-    return ResultContext.success(
+    return ResultContext.ok(
         data={
             "status": "healthy",
             "service": "ai-service",
