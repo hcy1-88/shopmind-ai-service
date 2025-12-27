@@ -47,17 +47,11 @@ async def lifespan(app: FastAPI):
         llm_service = get_llm_service()
         logger.info("LLM service 初始化成功！")
 
-        # # 初始化 database
-        # await init_db()
-        # logger.info("Database initialized")
-        #
+
         # # 初始化 Milvus
         # await init_milvus()
         # logger.info("Milvus initialized")
-        #
-        # # 初始化 RocketMQ
-        # await init_rocketmq()
-        # logger.info("RocketMQ initialized")
+
 
         logger.info("Shopmind AI service 启动成功！")
 
@@ -76,17 +70,10 @@ async def lifespan(app: FastAPI):
         await nacos_client.deregister_service()
         logger.info("Nacos service deregistered")
 
-        # # Close RocketMQ
-        # await close_rocketmq()
-        # logger.info("RocketMQ closed")
         #
         # # Close Milvus
         # await close_milvus()
         # logger.info("Milvus closed")
-        #
-        # # Close database
-        # await close_db()
-        # logger.info("Database closed")
 
         logger.info("AI service shutdown complete")
 

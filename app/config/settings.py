@@ -73,14 +73,6 @@ class Settings(BaseSettings):
         description="Service metadata",
     )
 
-    # PostgreSQL (优先 Nacos，若无 则取 .env 中的配置)
-    postgres_host: str = Field(default="localhost", description="PostgreSQL host")
-    postgres_port: int = Field(default=5432, description="PostgreSQL port")
-    postgres_user: str = Field(default="postgres", description="PostgreSQL user")
-    postgres_password: str = Field(default="postgres", description="PostgreSQL password")
-    postgres_db: str = Field(default="shopmind-dev", description="PostgreSQL database")
-    postgres_pool_size: int = Field(default=10, description="Connection pool size")
-    postgres_max_overflow: int = Field(default=20, description="Max overflow connections")
 
     # Milvus (优先 Nacos，若无 则取 .env 中的配置)
     milvus_host: str = Field(default="localhost", description="Milvus host")
@@ -89,23 +81,6 @@ class Settings(BaseSettings):
     milvus_password: Optional[str] = Field(default=None, description="Milvus password")
     milvus_db_name: str = Field(default="default", description="Milvus database name")
 
-    # RocketMQ (优先 Nacos，若无 则取 .env 中的配置)
-    rocketmq_namesrv_addr: str = Field(
-        default="127.0.0.1:9876",
-        description="RocketMQ NameServer address",
-    )
-    rocketmq_access_key: Optional[str] = Field(
-        default=None,
-        description="RocketMQ access key",
-    )
-    rocketmq_secret_key: Optional[str] = Field(
-        default=None,
-        description="RocketMQ secret key",
-    )
-    rocketmq_group_id: str = Field(
-        default="ai-service-group",
-        description="RocketMQ producer group ID",
-    )
 
     # LLM Configuration (优先 Nacos，若无 则取 .env 中的配置)
     llm_provider: str = Field(
@@ -154,13 +129,6 @@ class Settings(BaseSettings):
             _settings_instance = cls()
         return _settings_instance
 
-    @property
-    def postgres_url(self) -> str:
-        """Build PostgreSQL connection URL."""
-        return (
-            f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
-            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
-        )
 
 
 def get_settings() -> Settings:
