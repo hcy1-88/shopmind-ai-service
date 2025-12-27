@@ -2,7 +2,9 @@
 
 from typing import Generic, TypeVar, Optional, Dict, Any
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from app.schemas.base import CamelCaseModel
 
 from app.utils.trace_context import get_trace_id
 
@@ -13,10 +15,10 @@ SUCCESS_CODE = "0"
 SYSTEM_ERROR_CODE = "SYS9999"
 
 
-class ResultContext(BaseModel, Generic[T]):
+class ResultContext(CamelCaseModel, Generic[T]):
     """
     统一接口返回类型.
-    
+
     与 Java 微服务的 ResultContext 保持一致。
     """
 
@@ -33,7 +35,7 @@ class ResultContext(BaseModel, Generic[T]):
     message: str = Field(..., description="消息")
 
     # 链路追踪ID
-    traceId: str = Field(default_factory=get_trace_id, description="链路追踪ID")
+    trace_id: str = Field(default_factory=get_trace_id, description="链路追踪ID")
 
     # 额外信息，用于向后兼容
     extra: Dict[str, Any] = Field(default_factory=dict, description="额外信息")
@@ -84,7 +86,7 @@ class ResultContext(BaseModel, Generic[T]):
             code=SUCCESS_CODE,
             message=message,
             data=data,
-            traceId=trace_id if trace_id else get_trace_id(),
+            trace_id=trace_id if trace_id else get_trace_id(),
         )
 
     @staticmethod
@@ -111,7 +113,7 @@ class ResultContext(BaseModel, Generic[T]):
             code=code,
             message=message,
             data=data,
-            traceId=trace_id if trace_id else get_trace_id(),
+            trace_id=trace_id if trace_id else get_trace_id(),
         )
 
     # ==================== Builder 构建者模式 ====================
@@ -185,7 +187,7 @@ class ResultContextBuilder(Generic[T]):
             success=self._success if self._success is not None else False,
             code=self._code if self._code is not None else SYSTEM_ERROR_CODE,
             message=self._message if self._message is not None else "操作失败",
-            traceId=self._trace_id if self._trace_id is not None else get_trace_id(),
+            trace_id=self._trace_id if self._trace_id is not None else get_trace_id(),
             extra=self._extra,
         )
 

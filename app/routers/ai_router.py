@@ -86,7 +86,7 @@ async def check_image(
     try:
         logger.info(
             "Received image check request",
-            extra={"image_url": request.imageUrl[:100]},
+            extra={"image_url": request.image_url[:100]},
         )
 
         service = get_product_ai_service()
@@ -127,7 +127,7 @@ async def generate_description(
             extra={
                 "title": request.title[:50],
                 "category": request.category,
-                "image_count": len(request.imageUrls),
+                "image_count": len(request.image_urls),
             },
         )
 
@@ -171,7 +171,7 @@ async def generate_summary(
             extra={
                 "title": request.title[:50],
                 "category": request.category,
-                "image_count": len(request.imageUrls),
+                "image_count": len(request.image_urls),
             },
         )
 

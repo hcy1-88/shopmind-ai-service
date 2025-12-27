@@ -98,11 +98,11 @@ class ProductAIService:
         try:
             logger.info(
                 "Checking image compliance",
-                extra={"image_url": request.imageUrl[:100]},
+                extra={"image_url": request.image_url[:100]},
             )
 
             # Run chain
-            result = await self.image_check_chain.check(request.imageUrl)
+            result = await self.image_check_chain.check(request.image_url)
 
             # Convert to response
             response = ImageCheckResponse(
@@ -113,7 +113,7 @@ class ProductAIService:
             logger.info(
                 "Image check completed",
                 extra={
-                    "image_url": request.imageUrl[:100],
+                    "image_url": request.image_url[:100],
                     "valid": response.valid,
                 },
             )
@@ -147,7 +147,7 @@ class ProductAIService:
                 extra={
                     "title": request.title[:50],
                     "category": request.category,
-                    "image_count": len(request.imageUrls),
+                    "image_count": len(request.image_urls),
                 },
             )
 
@@ -155,7 +155,7 @@ class ProductAIService:
             description = await self.description_chain.generate(
                 title=request.title,
                 category=request.category,
-                image_urls=request.imageUrls,
+                image_urls=request.image_urls,
             )
 
             # Create response
@@ -197,7 +197,7 @@ class ProductAIService:
                 extra={
                     "title": request.title[:50],
                     "category": request.category,
-                    "image_count": len(request.imageUrls),
+                    "image_count": len(request.image_urls),
                 },
             )
 
@@ -205,11 +205,11 @@ class ProductAIService:
             summary = await self.summary_chain.generate(
                 title=request.title,
                 category=request.category,
-                image_urls=request.imageUrls,
+                image_urls=request.image_urls,
             )
 
             # Create response
-            response = SummaryGenerateResponse(aiSummary=summary)
+            response = SummaryGenerateResponse(ai_summary=summary)
 
             logger.info(
                 "Summary generation completed",
@@ -225,5 +225,5 @@ class ProductAIService:
             logger.error(f"Error in summary generation service: {e}")
             # Return fallback response
             return SummaryGenerateResponse(
-                aiSummary=f"抱歉，摘要生成服务暂时不可用。商品：{request.title}",
+                ai_summary=f"抱歉，摘要生成服务暂时不可用。商品：{request.title}",
             )

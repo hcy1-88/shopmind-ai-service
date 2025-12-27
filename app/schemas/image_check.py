@@ -1,19 +1,21 @@
 """图片检查相关的 Pydantic 模型."""
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import Field, HttpUrl
+
+from app.schemas.base import CamelCaseModel
 
 
-class ImageCheckRequest(BaseModel):
+class ImageCheckRequest(CamelCaseModel):
     """图片检查请求模型."""
 
-    imageUrl: str = Field(
+    image_url: str = Field(
         ...,
         description="图片URL（http/https）或base64编码的图片",
         examples=["https://example.com/product.jpg"],
     )
 
 
-class ImageCheckResponse(BaseModel):
+class ImageCheckResponse(CamelCaseModel):
     """图片检查响应模型."""
 
     valid: bool = Field(

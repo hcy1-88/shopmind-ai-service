@@ -1,9 +1,11 @@
 """商品摘要生成相关的 Pydantic 模型."""
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from app.schemas.base import CamelCaseModel
 
 
-class SummaryGenerateRequest(BaseModel):
+class SummaryGenerateRequest(CamelCaseModel):
     """商品摘要生成请求模型."""
 
     title: str = Field(
@@ -13,7 +15,7 @@ class SummaryGenerateRequest(BaseModel):
         description="商品标题",
         examples=["高品质纯棉T恤"],
     )
-    imageUrls: list[str] = Field(
+    image_urls: list[str] = Field(
         ...,
         min_length=1,
         max_length=10,
@@ -29,10 +31,10 @@ class SummaryGenerateRequest(BaseModel):
     )
 
 
-class SummaryGenerateResponse(BaseModel):
+class SummaryGenerateResponse(CamelCaseModel):
     """商品摘要生成响应模型."""
 
-    aiSummary: str = Field(
+    ai_summary: str = Field(
         ...,
         description="生成的商品摘要（最多200字）",
     )

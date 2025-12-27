@@ -1,9 +1,11 @@
 """商品描述生成相关的 Pydantic 模型."""
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from app.schemas.base import CamelCaseModel
 
 
-class DescriptionGenerateRequest(BaseModel):
+class DescriptionGenerateRequest(CamelCaseModel):
     """商品描述生成请求模型."""
 
     title: str = Field(
@@ -13,7 +15,7 @@ class DescriptionGenerateRequest(BaseModel):
         description="商品标题",
         examples=["高品质纯棉T恤"],
     )
-    imageUrls: list[str] = Field(
+    image_urls: list[str] = Field(
         ...,
         min_length=1,
         max_length=10,
@@ -29,7 +31,7 @@ class DescriptionGenerateRequest(BaseModel):
     )
 
 
-class DescriptionGenerateResponse(BaseModel):
+class DescriptionGenerateResponse(CamelCaseModel):
     """商品描述生成响应模型."""
 
     description: str = Field(

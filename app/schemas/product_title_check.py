@@ -1,9 +1,11 @@
 """标题检查相关的 Pydantic 模型."""
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from app.schemas.base import CamelCaseModel
 
 
-class TitleCheckRequest(BaseModel):
+class TitleCheckRequest(CamelCaseModel):
     """标题检查请求模型."""
 
     title: str = Field(
@@ -15,7 +17,7 @@ class TitleCheckRequest(BaseModel):
     )
 
 
-class TitleCheckResponse(BaseModel):
+class TitleCheckResponse(CamelCaseModel):
     """标题检查响应模型."""
 
     valid: bool = Field(
