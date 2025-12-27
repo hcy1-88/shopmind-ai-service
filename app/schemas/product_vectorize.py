@@ -1,0 +1,61 @@
+"""
+@File       : product_vectorize.py
+@Description:
+
+@Time       : 2025/12/28 3:53
+@Author     : hcy18
+"""
+from typing import List, Optional
+from pydantic import Field
+
+from app.schemas.base import CamelCaseModel
+
+
+class VectorizeProductRequest(CamelCaseModel):
+    """商品向量化请求模型."""
+
+    product_id: int = Field(
+        ...,
+        description="商品 ID",
+    )
+    title: str = Field(
+        ...,
+        description="商品标题",
+    )
+    description: str = Field(
+        ...,
+        description="商品描述",
+    )
+    ai_summary: str = Field(
+        ...,
+        description="AI 摘要",
+    )
+    tags: List[str] = Field(
+        ...,
+        description="商品标签列表",
+    )
+    category_id: int = Field(
+        ...,
+        description="商品分类 ID",
+    )
+
+
+class VectorizeProductResponse(CamelCaseModel):
+    """商品向量化响应模型."""
+
+    product_id: int = Field(
+        ...,
+        description="商品 ID",
+    )
+    success: bool = Field(
+        ...,
+        description="向量化是否成功",
+    )
+    vector_id: str = Field(
+        ...,
+        description="向量 ID（存储在向量数据库中的 ID）",
+    )
+    error_message: Optional[str] = Field(
+        default=None,
+        description="错误信息（如果失败）",
+    )

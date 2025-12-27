@@ -106,7 +106,7 @@ async def check_image(
     "/description-generate",
     response_model=ResultContext[DescriptionGenerateResponse],
     summary="生成商品描述",
-    description="根据商品的标题、图片、分类 生成描述，图片可选",
+    description="根据商品标题和图片生成详细的营销性商品描述",
     status_code=status.HTTP_200_OK,
 )
 async def generate_description(
@@ -126,7 +126,6 @@ async def generate_description(
             "Received description generation request",
             extra={
                 "title": request.title[:50],
-                "category": request.category,
                 "image_count": len(request.image_urls),
             },
         )
@@ -150,28 +149,28 @@ async def generate_description(
     "/summary-generate",
     response_model=ResultContext[SummaryGenerateResponse],
     summary="生成商品摘要",
-    description="根据商品的标题、图片、分类 生成简洁摘要（最多200字），图片可选",
+    description="根据完整的商品信息（标题、描述）生成简洁摘要",
     status_code=status.HTTP_200_OK,
 )
 async def generate_summary(
     request: SummaryGenerateRequest,
 ) -> ResultContext[SummaryGenerateResponse]:
     """
-    生成商品摘要.
+    生成商品摘要
 
     Args:
-        request: 生成摘要的请求体
+        request: 包含完整商品信息的请求体
 
     Returns:
-        生成结果
+        商品摘要
     """
     try:
         logger.info(
-            "Received summary generation request",
+            "摘要生成请求：",
             extra={
+                "product_id": request.product_id,
                 "title": request.title[:50],
-                "category": request.category,
-                "image_count": len(request.image_urls),
+                "description": request.description,
             },
         )
 
