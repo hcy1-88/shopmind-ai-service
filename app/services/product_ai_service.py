@@ -2,7 +2,10 @@
 
 from typing import Optional
 
-from app.chains.description_chain import DescriptionGenerationChain
+from app.chains.description_chain import (
+    DescriptionGenerationChain,
+    SummaryGenerationChain,
+)
 from app.chains.image_check_chain import ImageCheckChain
 from app.chains.title_check_chain import TitleCheckChain
 from app.schemas.description import (
@@ -10,6 +13,7 @@ from app.schemas.description import (
     DescriptionGenerateResponse,
 )
 from app.schemas.image_check import ImageCheckRequest, ImageCheckResponse
+from app.schemas.summary import SummaryGenerateRequest, SummaryGenerateResponse
 from app.schemas.title_check import TitleCheckRequest, TitleCheckResponse
 from app.utils.logger import app_logger as logger
 
@@ -25,6 +29,7 @@ class ProductAIService:
         self.title_check_chain = TitleCheckChain.get_instance()
         self.image_check_chain = ImageCheckChain.get_instance()
         self.description_chain = DescriptionGenerationChain.get_instance()
+        self.summary_chain = SummaryGenerationChain.get_instance()
 
     @classmethod
     def get_instance(cls) -> "ProductAIService":
@@ -128,7 +133,7 @@ class ProductAIService:
         request: DescriptionGenerateRequest,
     ) -> DescriptionGenerateResponse:
         """
-        Generate product description.
+        生成商品描述.
 
         Args:
             request: Description generation request
@@ -171,4 +176,54 @@ class ProductAIService:
             # Return fallback response
             return DescriptionGenerateResponse(
                 description=f"抱歉，描述生成服务暂时不可用。商品：{request.title}",
+            )
+
+    async def generate_summary(
+        self,
+        request: SummaryGenerateRequest,
+    ) -> SummaryGenerateResponse:
+        """
+        生成商品摘要
+
+        Args:
+            request: Summary generation request
+
+        Returns:
+            Summary generation response
+        """
+        try:
+            logger.info(
+                "Generating product summary",
+                extra={
+                    "title": request.title[:50],
+                    "category": request.category,
+                    "image_count": len(request.imageUrls),
+                },
+            )
+
+            # Run chain
+            summary = await self.summary_chain.generate(
+                title=request.title,
+                category=request.category,
+                image_urls=request.imageUrls,
+            )
+
+            # Create response
+            response = SummaryGenerateResponse(aiSummary=summary)
+
+            logger.info(
+                "Summary generation completed",
+                extra={
+                    "title": request.title[:50],
+                    "summary_length": len(summary),
+                },
+            )
+
+            return response
+
+        except Exception as e:
+            logger.error(f"Error in summary generation service: {e}")
+            # Return fallback response
+            return SummaryGenerateResponse(
+                aiSummary=f"抱歉，摘要生成服务暂时不可用。商品：{request.title}",
             )

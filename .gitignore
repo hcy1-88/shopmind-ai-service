@@ -10,11 +10,12 @@ wheels/
 .venv
 venv/
 env/
+.env
 
 # IDE
-.vscode/
-.cursor/
-.claude/
+.vscode
+.cursor
+.claude
 .idea/
 *.swp
 *.swo

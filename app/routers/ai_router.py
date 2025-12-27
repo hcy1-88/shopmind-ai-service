@@ -8,6 +8,7 @@ from app.schemas.description import (
 )
 from app.schemas.image_check import ImageCheckRequest, ImageCheckResponse
 from app.schemas.result_context import ResultContext
+from app.schemas.summary import SummaryGenerateRequest, SummaryGenerateResponse
 from app.schemas.title_check import TitleCheckRequest, TitleCheckResponse
 from app.services.product_ai_service import ProductAIService
 from app.utils.logger import app_logger as logger
@@ -141,6 +142,50 @@ async def generate_description(
         logger.error(f"Error in description generation endpoint: {e}")
         return ResultContext.fail(
             message=f"商品描述生成服务错误: {str(e)}",
+            code="SYS9999",
+        )
+
+
+@router.post(
+    "/summary-generate",
+    response_model=ResultContext[SummaryGenerateResponse],
+    summary="生成商品摘要",
+    description="根据商品的标题、图片、分类 生成简洁摘要（最多200字），图片可选",
+    status_code=status.HTTP_200_OK,
+)
+async def generate_summary(
+    request: SummaryGenerateRequest,
+) -> ResultContext[SummaryGenerateResponse]:
+    """
+    生成商品摘要.
+
+    Args:
+        request: 生成摘要的请求体
+
+    Returns:
+        生成结果
+    """
+    try:
+        logger.info(
+            "Received summary generation request",
+            extra={
+                "title": request.title[:50],
+                "category": request.category,
+                "image_count": len(request.imageUrls),
+            },
+        )
+
+        service = get_product_ai_service()
+        response = await service.generate_summary(request)
+
+        return ResultContext.ok(
+            data=response, message="商品摘要生成完成"
+        )
+
+    except Exception as e:
+        logger.error(f"Error in summary generation endpoint: {e}")
+        return ResultContext.fail(
+            message=f"商品摘要生成服务错误: {str(e)}",
             code="SYS9999",
         )
 
