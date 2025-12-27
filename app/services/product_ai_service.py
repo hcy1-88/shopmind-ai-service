@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from app.chains.description_chain import (
+from app.chains.text_gen_chain import (
     DescriptionGenerationChain,
     SummaryGenerationChain,
 )

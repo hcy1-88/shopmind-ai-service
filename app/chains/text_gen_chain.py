@@ -1,10 +1,7 @@
 """LangChain chain for product text generation (description, summary, etc.)."""
 import asyncio
-import base64
 from abc import ABC, abstractmethod
 from typing import Optional
-
-import httpx
 from langchain_core.messages import HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
 
