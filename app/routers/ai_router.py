@@ -2,14 +2,14 @@
 
 from fastapi import APIRouter, status
 
-from app.schemas.description import (
+from app.schemas.product_description import (
     DescriptionGenerateRequest,
     DescriptionGenerateResponse,
 )
 from app.schemas.image_check import ImageCheckRequest, ImageCheckResponse
 from app.schemas.result_context import ResultContext
-from app.schemas.summary import SummaryGenerateRequest, SummaryGenerateResponse
-from app.schemas.title_check import TitleCheckRequest, TitleCheckResponse
+from app.schemas.product_summary import SummaryGenerateRequest, SummaryGenerateResponse
+from app.schemas.product_title_check import TitleCheckRequest, TitleCheckResponse
 from app.services.product_ai_service import ProductAIService
 from app.utils.logger import app_logger as logger
 

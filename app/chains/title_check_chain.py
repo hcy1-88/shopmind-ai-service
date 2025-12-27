@@ -5,7 +5,7 @@ from typing import Optional
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
-from app.schemas.title_check import TitleCheckResponse
+from app.schemas.product_title_check import TitleCheckResponse
 from app.services.llm_service import get_llm_service
 from app.utils.logger import app_logger as logger
 

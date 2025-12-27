@@ -8,13 +8,13 @@ from app.chains.text_gen_chain import (
 )
 from app.chains.image_check_chain import ImageCheckChain
 from app.chains.title_check_chain import TitleCheckChain
-from app.schemas.description import (
+from app.schemas.product_description import (
     DescriptionGenerateRequest,
     DescriptionGenerateResponse,
 )
 from app.schemas.image_check import ImageCheckRequest, ImageCheckResponse
-from app.schemas.summary import SummaryGenerateRequest, SummaryGenerateResponse
-from app.schemas.title_check import TitleCheckRequest, TitleCheckResponse
+from app.schemas.product_summary import SummaryGenerateRequest, SummaryGenerateResponse
+from app.schemas.product_title_check import TitleCheckRequest, TitleCheckResponse
 from app.utils.logger import app_logger as logger
 
 
