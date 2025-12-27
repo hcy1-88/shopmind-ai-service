@@ -1,5 +1,5 @@
 [project]
-name = "ai-service"
+name = "shopmind-ai-service"
 version = "0.1.0"
 description = "AI microservice for intelligent e-commerce platform"
 readme = "README.md"
