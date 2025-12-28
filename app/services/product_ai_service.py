@@ -12,6 +12,7 @@ from app.schemas.product_description import (
 )
 from app.schemas.image_check import ImageCheckRequest, ImageCheckResponse
 from app.schemas.product_summary import SummaryGenerateRequest, SummaryGenerateResponse
+from app.schemas.product_tag import GenerateTagsRequest, GenerateTagsResponse
 from app.schemas.product_title_check import TitleCheckRequest, TitleCheckResponse
 from app.utils.logger import app_logger as logger
 
@@ -48,40 +49,30 @@ class ProductAIService:
         Returns:
             Title check response
         """
-        try:
-            logger.info(
-                "Checking title compliance",
-                extra={"title": request.title[:50]},
-            )
+        logger.info(
+            "Checking title compliance",
+            extra={"title": request.title[:50]},
+        )
 
-            # Run chain
-            result = await self.title_check_chain.check(request.title)
+        # Run chain
+        result = await self.title_check_chain.check(request.title)
 
-            # Convert to response
-            response = TitleCheckResponse(
-                valid=result.get("valid", False),
-                reason=result.get("reason"),
-                suggestions=result.get("suggestions") or [],
-            )
+        # Convert to response
+        response = TitleCheckResponse(
+            valid=result.get("valid", False),
+            reason=result.get("reason"),
+            suggestions=result.get("suggestions") or [],
+        )
 
-            logger.info(
-                "标题检查完毕",
-                extra={
-                    "title": request.title[:50],
-                    "valid": response.valid,
-                },
-            )
+        logger.info(
+            "标题检查完毕",
+            extra={
+                "title": request.title[:50],
+                "valid": response.valid,
+            },
+        )
 
-            return response
-
-        except Exception as e:
-            logger.error(f"Error in title check service: {e}")
-            # Return error response
-            return TitleCheckResponse(
-                valid=False,
-                reason=f"审核服务异常: {str(e)}",
-                suggestions=["请稍后重试"],
-            )
+        return response
 
     async def check_image(self, request: ImageCheckRequest) -> ImageCheckResponse:
         """
@@ -93,38 +84,29 @@ class ProductAIService:
         Returns:
             Image check response
         """
-        try:
-            logger.info(
-                "Checking image compliance",
-                extra={"image_url": request.image_url[:100]},
-            )
+        logger.info(
+            "Checking image compliance",
+            extra={"image_url": request.image_url[:100]},
+        )
 
-            # Run chain
-            result = await self.image_check_chain.check(request.image_url)
+        # Run chain
+        result = await self.image_check_chain.check(request.image_url)
 
-            # Convert to response
-            response = ImageCheckResponse(
-                valid=result.get("valid", False),
-                reason=result.get("reason"),
-            )
+        # Convert to response
+        response = ImageCheckResponse(
+            valid=result.get("valid", False),
+            reason=result.get("reason"),
+        )
 
-            logger.info(
-                "Image check completed",
-                extra={
-                    "image_url": request.image_url[:100],
-                    "valid": response.valid,
-                },
-            )
+        logger.info(
+            "Image check completed",
+            extra={
+                "image_url": request.image_url[:100],
+                "valid": response.valid,
+            },
+        )
 
-            return response
-
-        except Exception as e:
-            logger.error(f"Error in image check service: {e}")
-            # Return error response
-            return ImageCheckResponse(
-                valid=False,
-                reason=f"审核服务异常: {str(e)}",
-            )
+        return response
 
     async def generate_description(
         self,
@@ -139,40 +121,32 @@ class ProductAIService:
         Returns:
             Description generation response
         """
-        try:
-            logger.info(
-                "生成商品描述",
-                extra={
-                    "title": request.title[:50],
-                    "image_count": len(request.image_urls),
-                },
-            )
+        logger.info(
+            "生成商品描述",
+            extra={
+                "title": request.title[:50],
+                "image_count": len(request.image_urls),
+            },
+        )
 
-            # Run chain - 新的描述生成链只需要 title 和 image_urls
-            description = await self.description_chain.generate(
-                title=request.title,
-                image_urls=request.image_urls,
-            )
+        # Run chain - 新的描述生成链只需要 title 和 image_urls
+        description = await self.description_chain.generate(
+            title=request.title,
+            image_urls=request.image_urls,
+        )
 
-            # Create response
-            response = DescriptionGenerateResponse(description=description)
+        # Create response
+        response = DescriptionGenerateResponse(description=description)
 
-            logger.info(
-                "Description generation completed",
-                extra={
-                    "title": request.title[:50],
-                    "description_length": len(description),
-                },
-            )
+        logger.info(
+            "Description generation completed",
+            extra={
+                "title": request.title[:50],
+                "description_length": len(description),
+            },
+        )
 
-            return response
-
-        except Exception as e:
-            logger.error(f"Error in description generation service: {e}")
-            # Return fallback response
-            return DescriptionGenerateResponse(
-                description=f"抱歉，描述生成服务暂时不可用。商品：{request.title}",
-            )
+        return response
 
     async def generate_summary(
         self,
@@ -187,37 +161,38 @@ class ProductAIService:
         Returns:
             包含 summary 的响应
         """
-        try:
-            logger.info(
-                "生成商品摘要",
-                extra={
-                    "title": request.title[:50],
-                    "description_length": len(request.description),
-                },
-            )
+        logger.info(
+            "生成商品摘要",
+            extra={
+                "title": request.title[:50],
+                "description_length": len(request.description),
+            },
+        )
 
-            # Run chain - 只需要 title 和 description，返回字符串
-            summary = await self.summary_chain.generate(
-                title=request.title,
-                description=request.description,
-            )
+        # Run chain - 只需要 title 和 description，返回字符串
+        summary = await self.summary_chain.generate(
+            title=request.title,
+            description=request.description,
+        )
 
-            # Create response
-            response = SummaryGenerateResponse(summary=summary)
+        # Create response
+        response = SummaryGenerateResponse(summary=summary)
 
-            logger.info(
-                "商品摘要生成完成",
-                extra={
-                    "title": request.title[:50],
-                    "summary_length": len(summary),
-                },
-            )
+        logger.info(
+            "商品摘要生成完成",
+            extra={
+                "title": request.title[:50],
+                "summary_length": len(summary),
+            },
+        )
 
-            return response
+        return response
 
-        except Exception as e:
-            logger.error(f"Error in summary generation service: {e}", exc_info=True)
-            # Return fallback response
-            return SummaryGenerateResponse(
-                summary=f"抱歉，摘要生成服务暂时不可用。商品：{request.title}",
-            )
+    async def generate_product_tags(
+        self,
+        request: GenerateTagsRequest,
+    ) -> GenerateTagsResponse:
+        """
+        生成商品标签
+        """
+        pass

@@ -179,4 +179,30 @@ async def generate_summary(
     )
 
 
+@router.post(
+    "/generate/product-tags",
+    response_model=ResultContext[GenerateTagsResponse],
+    summary="生成商品标签",
+    description="根据商品标题和描述，生成商品展示标签"
+)
+async def generate_product_tags(
+        request: GenerateTagsRequest,
+        service: ProductAIService = Depends(get_product_ai_service),
+) -> ResultContext[GenerateTagsResponse]:
+    """
+    生成商品标签
+    """
+    logger.info(
+        "商品标签生成请求：",
+        extra={
+            "product_id": request.product_id,
+            "title": request.title[:50],
+            "description": request.description[:50],
+        },
+    )
+    
+    # response = await service.
 
+    # return ResultContext.ok(
+    #     data=response, message="商品摘要生成完成"
+    # )
