@@ -2,10 +2,10 @@
 
 from typing import Optional
 
-from app.chains.description_generation_chain import DescriptionGenerationChain
-from app.chains.summary_generation_chain import SummaryGenerationChain
-from app.chains.image_check_chain import ImageCheckChain
-from app.chains.title_check_chain import TitleCheckChain
+from app.chains.product.description_generation_chain import DescriptionGenerationChain
+from app.chains.product.summary_generation_chain import SummaryGenerationChain
+from app.chains.product.image_check_chain import ImageCheckChain
+from app.chains.product.title_check_chain import TitleCheckChain
 from app.schemas.product_description import (
     DescriptionGenerateRequest,
     DescriptionGenerateResponse,
