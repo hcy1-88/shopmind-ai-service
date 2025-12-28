@@ -47,10 +47,6 @@ class TagInfo(CamelCaseModel):
         ...,
         description="推荐的颜色（UI 显示用）",
     )
-    relevance_score: float = Field(
-        ...,
-        description="相关性评分 0-1",
-    )
 
 
 class GenerateTagsResponse(CamelCaseModel):

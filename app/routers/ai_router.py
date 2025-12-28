@@ -7,7 +7,7 @@ from app.schemas.product_description import (
     DescriptionGenerateResponse,
 )
 from app.schemas.image_check import ImageCheckRequest, ImageCheckResponse
-from app.schemas.product_tag import GenerateTagsResponse
+from app.schemas.product_tag import GenerateTagsResponse, GenerateTagsRequest
 from app.schemas.result_context import ResultContext
 from app.schemas.product_summary import SummaryGenerateRequest, SummaryGenerateResponse
 from app.schemas.product_title_check import TitleCheckRequest, TitleCheckResponse
@@ -20,8 +20,7 @@ router = APIRouter(
     tags=["AI Services"],
 )
 
-# 延迟初始化：不在模块级别初始化，避免在 Nacos 连接之前触发
-# product_ai_service 将在第一次调用时通过 get_product_ai_service() 获取
+
 def get_product_ai_service() -> ProductAIService:
     """获取 ProductAIService 单例实例（延迟初始化）."""
     return ProductAIService.get_instance()
@@ -166,7 +165,7 @@ async def generate_description(
 
 
 @router.post(
-    "/summary-generate",
+    "/generate/product-summary",
     response_model=ResultContext[SummaryGenerateResponse],
     summary="生成商品摘要",
     description="根据完整的商品信息（标题、描述）生成简洁摘要",
@@ -189,7 +188,7 @@ async def generate_summary(
             extra={
                 "product_id": request.product_id,
                 "title": request.title[:50],
-                "description": request.description,
+                "description": request.description[:50],
             },
         )
 
