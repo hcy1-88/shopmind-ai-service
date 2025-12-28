@@ -22,14 +22,6 @@ class ProductAIService:
 
     _instance: Optional["ProductAIService"] = None
 
-    def __init__(self):
-        """Initialize product AI service."""
-        # 使用单例 chain
-        self.title_check_chain = TitleCheckChain.get_instance()
-        self.image_check_chain = ImageCheckChain.get_instance()
-        self.description_chain = DescriptionGenerationChain.get_instance()
-        self.summary_chain = SummaryGenerationChain.get_instance()
-
     @classmethod
     def get_instance(cls) -> "ProductAIService":
         """
@@ -55,7 +47,7 @@ class ProductAIService:
         )
 
         # Run chain
-        result = await self.title_check_chain.check(request.title)
+        result = await TitleCheckChain.get_instance().check(request.title)
 
         # Convert to response
         response = TitleCheckResponse(
@@ -90,7 +82,7 @@ class ProductAIService:
         )
 
         # Run chain
-        result = await self.image_check_chain.check(request.image_url)
+        result = await ImageCheckChain.get_instance().check(request.image_url)
 
         # Convert to response
         response = ImageCheckResponse(
@@ -130,7 +122,7 @@ class ProductAIService:
         )
 
         # Run chain - 新的描述生成链只需要 title 和 image_urls
-        description = await self.description_chain.generate(
+        description = await DescriptionGenerationChain.get_instance().generate(
             title=request.title,
             image_urls=request.image_urls,
         )
@@ -170,7 +162,7 @@ class ProductAIService:
         )
 
         # Run chain - 只需要 title 和 description，返回字符串
-        summary = await self.summary_chain.generate(
+        summary = await SummaryGenerationChain.get_instance().generate(
             title=request.title,
             description=request.description,
         )
