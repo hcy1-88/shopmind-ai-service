@@ -31,25 +31,21 @@ class VisionAwareAIGenerator(ABC, Generic[InputType, OutputType]):
         """判断输入是否包含有效图片 URL 列表"""
         pass
 
-    @abstractmethod
     def _get_text_only_system_prompt(self) -> str:
         """纯文本模式的系统提示"""
-        pass
+        return ""
 
-    @abstractmethod
     def _get_vision_system_prompt(self) -> str:
         """视觉模式的系统提示"""
-        pass
+        return ""
 
-    @abstractmethod
     def _build_text_only_human_message_content(self, input_data: InputType) -> str:
         """构建纯文本 HumanMessage 的 content（字符串）"""
-        pass
+        return ""
 
-    @abstractmethod
     def _build_vision_human_message_base_text(self, input_data: InputType) -> str:
         """构建视觉 HumanMessage 中的文本部分（用于拼接图片）"""
-        pass
+        return ""
 
     @abstractmethod
     def _get_output_parser(self) -> BaseOutputParser:

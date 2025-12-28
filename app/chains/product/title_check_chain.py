@@ -2,29 +2,25 @@
 
 from typing import Optional
 
-from langchain_core.output_parsers import JsonOutputParser
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import BaseOutputParser, PydanticOutputParser
 
-from app.schemas.product_title_check import TitleCheckResponse
-from app.services.llm_service import get_llm_service
+from app.chains.product.base_ai_generator_chain import VisionAwareAIGenerator
+from app.schemas import TitleCheckRequest, TitleCheckResponse
 from app.utils.logger import app_logger as logger
 
 
-class TitleCheckChain:
+class TitleCheckChain(VisionAwareAIGenerator[TitleCheckRequest, TitleCheckResponse]):
     """商品标题检查合规性的 chain."""
 
     _instance: Optional["TitleCheckChain"] = None
 
-    def __init__(self):
-        """Initialize title check chain."""
-        self.llm_service = get_llm_service()
+    def _has_images(self, input_data: TitleCheckRequest) -> bool:
+        """标题检查不需要图片"""
+        return False
 
-        # Define the prompt template
-        self.prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    """你是一个专业的电商平台内容审核专家。你的任务是审核商品标题是否符合平台规范。
+    def _get_text_only_system_prompt(self) -> str:
+        """纯文本模式的系统提示"""
+        return """你是一个专业的电商平台内容审核专家。你的任务是审核商品标题是否符合平台规范。
 
 审核标准：
 1. **禁止违规内容**：不得包含色情、暴力、政治敏感、违法不良信息。
@@ -33,23 +29,31 @@ class TitleCheckChain:
    - 可使用"政府补贴"、"政府补助"、"消费补贴"、"以旧换新补贴"等表述，前提是该类补贴在当前国家或地方政府政策中真实存在（如2024-2025年消费品以旧换新行动）。
    - 可使用"百亿补贴"、"平台补贴"、"限时优惠"、"直降"等电商平台常见营销术语，但不得虚构补贴金额或来源。
 4. **禁止诱导点击**：如"点击领取"、"必抢"、"手慢无"等强诱导性话术。
-5. **商品信息需基本真实**：品牌、型号、核心配置（如"M4芯片"、"13英寸"）必须准确。
+5. **商品信息需基本真实**：品牌、型号、核心配置（如"M4芯片"、"13英寸"）必须准确。"""
 
-请以JSON格式返回审核结果：
-{{
-    "valid": true/false,
-    "reason": "不合规原因（如果不合规）",
-    "suggestions": ["建议1", "建议2"]
-}}
 
-如果标题合规，reason设为null，suggestions设为空数组。""",
-                ),
-                ("human", "请审核这个商品标题：{title}"),
-            ],
-        )
+    def _build_text_only_human_message_content(self, input_data: TitleCheckRequest) -> str:
+        """构建纯文本 HumanMessage 的 content"""
+        return f"请审核这个商品标题：{input_data.title}"
 
-        # Output parser with Pydantic model for validation
-        self.output_parser = JsonOutputParser(pydantic_object=TitleCheckResponse)
+
+    def _get_output_parser(self) -> BaseOutputParser:
+        """返回输出解析器"""
+        return PydanticOutputParser(pydantic_object=TitleCheckResponse)
+
+
+    async def generate(self, input_data: TitleCheckRequest) -> TitleCheckResponse:
+        """重写 generate 方法，添加异常处理"""
+        try:
+            return await super().generate(input_data)
+        except Exception as e:
+            logger.error(f"Error in title check chain: {e}", exc_info=True)
+            # 安全输出
+            return TitleCheckResponse(
+                valid=False,
+                reason=f"审核过程出现错误: {str(e)}",
+                suggestions=["请稍后重试"],
+            )
 
     @classmethod
     def get_instance(cls) -> "TitleCheckChain":
@@ -62,42 +66,3 @@ class TitleCheckChain:
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
-
-    async def check(self, title: str) -> dict:
-        """
-        Check if title is compliant.
-
-        Args:
-            title: Product title to check
-
-        Returns:
-            Dictionary with validation result
-        """
-        try:
-            # Get chat model
-            llm = self.llm_service.get_chat_model()
-
-            # Create chain
-            chain = self.prompt | llm | self.output_parser
-
-            # Run chain
-            result = await chain.ainvoke({"title": title})
-
-            logger.info(
-                "Title check completed",
-                extra={
-                    "title": title[:50],
-                    "valid": result.get("valid"),
-                },
-            )
-
-            return result
-
-        except Exception as e:
-            logger.error(f"Error in title check chain: {e}")
-            # 安全输出
-            return {
-                "valid": False,
-                "reason": f"审核过程出现错误: {str(e)}",
-                "suggestions": ["请稍后重试"],
-            }

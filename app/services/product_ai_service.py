@@ -35,14 +35,7 @@ class ProductAIService:
         )
 
         # Run chain
-        result = await TitleCheckChain.get_instance().check(request.title)
-
-        # Convert to response
-        response = TitleCheckResponse(
-            valid=result.get("valid", False),
-            reason=result.get("reason"),
-            suggestions=result.get("suggestions") or [],
-        )
+        response = await TitleCheckChain.get_instance().generate(request)
 
         logger.info(
             "标题检查完毕",
@@ -71,13 +64,7 @@ class ProductAIService:
         )
 
         # Run chain
-        result = await ImageCheckChain.get_instance().check(request.image_url)
-
-        # Convert to response
-        response = ImageCheckResponse(
-            valid=result.get("valid", False),
-            reason=result.get("reason"),
-        )
+        response = await ImageCheckChain.get_instance().generate(request)
 
         logger.info(
             "Image check completed",

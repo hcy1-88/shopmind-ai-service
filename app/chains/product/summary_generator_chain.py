@@ -36,13 +36,6 @@ class SummaryGenerationChain(VisionAwareAIGenerator[SummaryGenerateRequest, Summ
         return f"商品信息如下：\n标题：{input_data.title}\n描述：{input_data.description}\n\n请生成商品摘要："
 
 
-    def _get_vision_system_prompt(self) -> str:
-        pass
-
-    def _build_vision_human_message_base_text(self, input_data: InputType) -> str:
-        pass
-
-
     def _get_output_parser(self) -> BaseOutputParser:
         return PydanticOutputParser(pydantic_object=SummaryGenerateResponse)
 
