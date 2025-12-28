@@ -1,6 +1,6 @@
 """AI service routers for FastAPI."""
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 
 from app.schemas.product_description import (
     DescriptionGenerateRequest,
@@ -22,7 +22,7 @@ router = APIRouter(
 
 
 def get_product_ai_service() -> ProductAIService:
-    """获取 ProductAIService 单例实例（延迟初始化）."""
+    """获取 ProductAIService 单例实例（依赖注入）."""
     return ProductAIService.get_instance()
 
 
@@ -56,33 +56,26 @@ async def health_check() -> ResultContext[dict]:
 )
 async def check_title(
     request: TitleCheckRequest,
+    service: ProductAIService = Depends(get_product_ai_service),
 ) -> ResultContext[TitleCheckResponse]:
     """
     检查商品标题是否合规.
 
     Args:
         request: 商品标题检查请求
+        service: ProductAIService 实例（依赖注入）
 
     Returns:
         检查结果
     """
-    try:
-        logger.info(
-            "Received title check request",
-            extra={"title": request.title[:50]},
-        )
+    logger.info(
+        "Received title check request",
+        extra={"title": request.title[:50]},
+    )
 
-        service = get_product_ai_service()
-        response = await service.check_title(request)
+    response = await service.check_title(request)
 
-        return ResultContext.ok(data=response, message="标题检查完成")
-
-    except Exception as e:
-        logger.error(f"Error in title check endpoint: {e}")
-        return ResultContext.fail(
-            message=f"标题检查服务错误: {str(e)}",
-            code="SYS9999",
-        )
+    return ResultContext.ok(data=response, message="标题检查完成")
 
 
 @router.post(
@@ -93,33 +86,26 @@ async def check_title(
 )
 async def check_image(
     request: ImageCheckRequest,
+    service: ProductAIService = Depends(get_product_ai_service),
 ) -> ResultContext[ImageCheckResponse]:
     """
     检查图片合规性
 
     Args:
         request: 请求体
+        service: ProductAIService 实例（依赖注入）
 
     Returns:
         检查结果
     """
-    try:
-        logger.info(
-            "Received image check request",
-            extra={"image_url": request.image_url[:100]},
-        )
+    logger.info(
+        "Received image check request",
+        extra={"image_url": request.image_url[:100]},
+    )
 
-        service = get_product_ai_service()
-        response = await service.check_image(request)
+    response = await service.check_image(request)
 
-        return ResultContext.ok(data=response, message="图片检查完成")
-
-    except Exception as e:
-        logger.error(f"Error in image check endpoint: {e}")
-        return ResultContext.fail(
-            message=f"图片检查服务错误: {str(e)}",
-            code="SYS9999",
-        )
+    return ResultContext.ok(data=response, message="图片检查完成")
 
 
 @router.post(
@@ -130,38 +116,31 @@ async def check_image(
 )
 async def generate_description(
     request: DescriptionGenerateRequest,
+    service: ProductAIService = Depends(get_product_ai_service),
 ) -> ResultContext[DescriptionGenerateResponse]:
     """
     生成一段描述.
 
     Args:
         request: 生成描述的请求体
+        service: ProductAIService 实例（依赖注入）
 
     Returns:
         检查结果
     """
-    try:
-        logger.info(
-            "Received description generation request",
-            extra={
-                "title": request.title[:50],
-                "image_count": len(request.image_urls),
-            },
-        )
+    logger.info(
+        "Received description generation request",
+        extra={
+            "title": request.title[:50],
+            "image_count": len(request.image_urls),
+        },
+    )
 
-        service = get_product_ai_service()
-        response = await service.generate_description(request)
+    response = await service.generate_description(request)
 
-        return ResultContext.ok(
-            data=response, message="商品描述生成完成"
-        )
-
-    except Exception as e:
-        logger.error(f"Error in description generation endpoint: {e}")
-        return ResultContext.fail(
-            message=f"商品描述生成服务错误: {str(e)}",
-            code="SYS9999",
-        )
+    return ResultContext.ok(
+        data=response, message="商品描述生成完成"
+    )
 
 
 @router.post(
@@ -172,39 +151,32 @@ async def generate_description(
 )
 async def generate_summary(
     request: SummaryGenerateRequest,
+    service: ProductAIService = Depends(get_product_ai_service),
 ) -> ResultContext[SummaryGenerateResponse]:
     """
     生成商品摘要
 
     Args:
         request: 包含完整商品信息的请求体
+        service: ProductAIService 实例（依赖注入）
 
     Returns:
         商品摘要
     """
-    try:
-        logger.info(
-            "摘要生成请求：",
-            extra={
-                "product_id": request.product_id,
-                "title": request.title[:50],
-                "description": request.description[:50],
-            },
-        )
+    logger.info(
+        "摘要生成请求：",
+        extra={
+            "product_id": request.product_id,
+            "title": request.title[:50],
+            "description": request.description[:50],
+        },
+    )
 
-        service = get_product_ai_service()
-        response = await service.generate_summary(request)
+    response = await service.generate_summary(request)
 
-        return ResultContext.ok(
-            data=response, message="商品摘要生成完成"
-        )
-
-    except Exception as e:
-        logger.error(f"Error in summary generation endpoint: {e}")
-        return ResultContext.fail(
-            message=f"商品摘要生成服务错误: {str(e)}",
-            code="SYS9999",
-        )
+    return ResultContext.ok(
+        data=response, message="商品摘要生成完成"
+    )
 
 
 

@@ -51,6 +51,7 @@ class LLMService:
                     f"未知的提供商 {provider_name}，回退到 OpenAI",
                 )
                 self.provider = OpenAIProvider(self._config.get("openai", {}))
+            self.provider_name = provider_name
 
             logger.info(
                 "LLM provider 初始化完毕！",

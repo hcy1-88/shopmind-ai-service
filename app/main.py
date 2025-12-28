@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
         # 初始化 LLM 服务
         from app.services.llm_service import get_llm_service
         llm_service = get_llm_service()
-        logger.info("LLM service 初始化成功！")
+        logger.info("LLM service 初始化成功，提供商：%s！", llm_service.provider_name)
 
 
         # # 初始化 Milvus
