@@ -7,6 +7,7 @@ from app.schemas.product_description import (
     DescriptionGenerateResponse,
 )
 from app.schemas.image_check import ImageCheckRequest, ImageCheckResponse
+from app.schemas.product_tag import GenerateTagsResponse
 from app.schemas.result_context import ResultContext
 from app.schemas.product_summary import SummaryGenerateRequest, SummaryGenerateResponse
 from app.schemas.product_title_check import TitleCheckRequest, TitleCheckResponse
@@ -26,12 +27,33 @@ def get_product_ai_service() -> ProductAIService:
     return ProductAIService.get_instance()
 
 
+@router.get(
+    "/health",
+    response_model=ResultContext[dict],
+    summary="Health check",
+    description="Check if AI service is healthy",
+)
+async def health_check() -> ResultContext[dict]:
+    """
+    Health check endpoint.
+
+    Returns:
+        ResultContext containing health status
+    """
+    return ResultContext.ok(
+        data={
+            "status": "healthy",
+            "service": "ai-service",
+        },
+        message="服务运行正常",
+    )
+
+
 @router.post(
     "/title-check",
     response_model=ResultContext[TitleCheckResponse],
     summary="检查商品标题是否合规",
     description="检查商品标题是否合规，不能有违规字词",
-    status_code=status.HTTP_200_OK,
 )
 async def check_title(
     request: TitleCheckRequest,
@@ -69,7 +91,6 @@ async def check_title(
     response_model=ResultContext[ImageCheckResponse],
     summary="检查图片合规性",
     description="检查图片是否符合平台标准",
-    status_code=status.HTTP_200_OK,
 )
 async def check_image(
     request: ImageCheckRequest,
@@ -107,7 +128,6 @@ async def check_image(
     response_model=ResultContext[DescriptionGenerateResponse],
     summary="生成商品描述",
     description="根据商品标题和图片生成详细的营销性商品描述",
-    status_code=status.HTTP_200_OK,
 )
 async def generate_description(
     request: DescriptionGenerateRequest,
@@ -150,7 +170,6 @@ async def generate_description(
     response_model=ResultContext[SummaryGenerateResponse],
     summary="生成商品摘要",
     description="根据完整的商品信息（标题、描述）生成简洁摘要",
-    status_code=status.HTTP_200_OK,
 )
 async def generate_summary(
     request: SummaryGenerateRequest,
@@ -189,24 +208,4 @@ async def generate_summary(
         )
 
 
-@router.get(
-    "/health",
-    response_model=ResultContext[dict],
-    summary="Health check",
-    description="Check if AI service is healthy",
-    status_code=status.HTTP_200_OK,
-)
-async def health_check() -> ResultContext[dict]:
-    """
-    Health check endpoint.
 
-    Returns:
-        ResultContext containing health status
-    """
-    return ResultContext.ok(
-        data={
-            "status": "healthy",
-            "service": "ai-service",
-        },
-        message="服务运行正常",
-    )
