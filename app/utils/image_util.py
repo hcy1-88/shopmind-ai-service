@@ -9,7 +9,6 @@ import base64
 import mimetypes
 import re
 from urllib.parse import urlparse
-
 import httpx
 
 
@@ -25,8 +24,10 @@ def is_base64_image(image_data: str) -> bool:
     pattern = r'^data:image/([a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=]+)$'
     if re.fullmatch(pattern, image_data):
         return True
-    else:
+    elif image_data.startswith("http://") or image_data.startswith("https://"):
         return False
+    else :
+        raise ValueError("图片格式错误：%s", image_data)
 
 
 async def load_image_from_url(url: str) -> str:

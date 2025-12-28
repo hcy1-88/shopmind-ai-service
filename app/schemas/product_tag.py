@@ -45,7 +45,7 @@ class TagInfo(CamelCaseModel):
     )
     color: str = Field(
         ...,
-        description="推荐的颜色（UI 显示用）",
+        description="推荐的颜色（UI 显示用），是 十六进制，如 '#ff4444'",
     )
 
 

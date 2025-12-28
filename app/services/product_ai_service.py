@@ -1,10 +1,9 @@
 """商品 AI 辅助服务."""
 
-from typing import Optional
-
 from app.chains.product.description_generation_chain import DescriptionGenerationChain
 from app.chains.product.summary_generation_chain import SummaryGenerationChain
 from app.chains.product.image_check_chain import ImageCheckChain
+from app.chains.product.tag_generator_chain import ProductTagGenChain
 from app.chains.product.title_check_chain import TitleCheckChain
 from app.schemas.product_description import (
     DescriptionGenerateRequest,
@@ -20,18 +19,8 @@ from app.utils.logger import app_logger as logger
 class ProductAIService:
     """商品 AI 辅助服务."""
 
-    _instance: Optional["ProductAIService"] = None
-
-    @classmethod
-    def get_instance(cls) -> "ProductAIService":
-        """
-        获取 ProductAIService 单例
-        """
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance
-
-    async def check_title(self, request: TitleCheckRequest) -> TitleCheckResponse:
+    @staticmethod
+    async def check_title(request: TitleCheckRequest) -> TitleCheckResponse:
         """
         检测标题合规性.
 
@@ -66,7 +55,8 @@ class ProductAIService:
 
         return response
 
-    async def check_image(self, request: ImageCheckRequest) -> ImageCheckResponse:
+    @staticmethod
+    async def check_image(request: ImageCheckRequest) -> ImageCheckResponse:
         """
         检测图片合规性.
 
@@ -100,8 +90,8 @@ class ProductAIService:
 
         return response
 
+    @staticmethod
     async def generate_description(
-        self,
         request: DescriptionGenerateRequest,
     ) -> DescriptionGenerateResponse:
         """
@@ -140,8 +130,8 @@ class ProductAIService:
 
         return response
 
+    @staticmethod
     async def generate_summary(
-        self,
         request: SummaryGenerateRequest,
     ) -> SummaryGenerateResponse:
         """
@@ -180,11 +170,13 @@ class ProductAIService:
 
         return response
 
+    @staticmethod
     async def generate_product_tags(
-        self,
         request: GenerateTagsRequest,
     ) -> GenerateTagsResponse:
         """
         生成商品标签
         """
-        pass
+        res = await ProductTagGenChain.get_instance().generate(request)
+        logger.info("商品标签生成完毕，商品 id：%s", request.product_id)
+        return res

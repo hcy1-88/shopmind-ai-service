@@ -1,6 +1,6 @@
 """AI service routers for FastAPI."""
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter
 
 from app.schemas.product_description import (
     DescriptionGenerateRequest,
@@ -19,11 +19,6 @@ router = APIRouter(
     prefix="/ai",
     tags=["AI Services"],
 )
-
-
-def get_product_ai_service() -> ProductAIService:
-    """获取 ProductAIService 单例实例（依赖注入）."""
-    return ProductAIService.get_instance()
 
 
 @router.get(
@@ -56,14 +51,12 @@ async def health_check() -> ResultContext[dict]:
 )
 async def check_title(
     request: TitleCheckRequest,
-    service: ProductAIService = Depends(get_product_ai_service),
 ) -> ResultContext[TitleCheckResponse]:
     """
     检查商品标题是否合规.
 
     Args:
         request: 商品标题检查请求
-        service: ProductAIService 实例（依赖注入）
 
     Returns:
         检查结果
@@ -73,7 +66,7 @@ async def check_title(
         extra={"title": request.title[:50]},
     )
 
-    response = await service.check_title(request)
+    response = await ProductAIService.check_title(request)
 
     return ResultContext.ok(data=response, message="标题检查完成")
 
@@ -86,14 +79,12 @@ async def check_title(
 )
 async def check_image(
     request: ImageCheckRequest,
-    service: ProductAIService = Depends(get_product_ai_service),
 ) -> ResultContext[ImageCheckResponse]:
     """
     检查图片合规性
 
     Args:
         request: 请求体
-        service: ProductAIService 实例（依赖注入）
 
     Returns:
         检查结果
@@ -103,7 +94,7 @@ async def check_image(
         extra={"image_url": request.image_url[:100]},
     )
 
-    response = await service.check_image(request)
+    response = await ProductAIService.check_image(request)
 
     return ResultContext.ok(data=response, message="图片检查完成")
 
@@ -116,14 +107,12 @@ async def check_image(
 )
 async def generate_description(
     request: DescriptionGenerateRequest,
-    service: ProductAIService = Depends(get_product_ai_service),
 ) -> ResultContext[DescriptionGenerateResponse]:
     """
     生成一段描述.
 
     Args:
         request: 生成描述的请求体
-        service: ProductAIService 实例（依赖注入）
 
     Returns:
         检查结果
@@ -136,7 +125,7 @@ async def generate_description(
         },
     )
 
-    response = await service.generate_description(request)
+    response = await ProductAIService.generate_description(request)
 
     return ResultContext.ok(
         data=response, message="商品描述生成完成"
@@ -151,14 +140,12 @@ async def generate_description(
 )
 async def generate_summary(
     request: SummaryGenerateRequest,
-    service: ProductAIService = Depends(get_product_ai_service),
 ) -> ResultContext[SummaryGenerateResponse]:
     """
     生成商品摘要
 
     Args:
         request: 包含完整商品信息的请求体
-        service: ProductAIService 实例（依赖注入）
 
     Returns:
         商品摘要
@@ -172,7 +159,7 @@ async def generate_summary(
         },
     )
 
-    response = await service.generate_summary(request)
+    response = await ProductAIService.generate_summary(request)
 
     return ResultContext.ok(
         data=response, message="商品摘要生成完成"
@@ -187,7 +174,6 @@ async def generate_summary(
 )
 async def generate_product_tags(
         request: GenerateTagsRequest,
-        service: ProductAIService = Depends(get_product_ai_service),
 ) -> ResultContext[GenerateTagsResponse]:
     """
     生成商品标签
@@ -201,8 +187,8 @@ async def generate_product_tags(
         },
     )
     
-    # response = await service.
+    response = await ProductAIService.generate_product_tags(request)
 
-    # return ResultContext.ok(
-    #     data=response, message="商品摘要生成完成"
-    # )
+    return ResultContext.ok(
+        data=response, message="商品标签生成完成"
+    )
