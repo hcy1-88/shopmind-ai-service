@@ -1,6 +1,6 @@
 """商品 AI 辅助服务."""
 from app.chains.product.description_generator_chain import DescriptionGenerationChain
-from app.chains.product.summary_generation_chain import SummaryGenerationChain
+from app.chains.product.summary_generator_chain import SummaryGenerationChain
 from app.chains.product.image_check_chain import ImageCheckChain
 from app.chains.product.tag_generator_chain import ProductTagGenChain
 from app.chains.product.title_check_chain import TitleCheckChain
@@ -145,23 +145,18 @@ class ProductAIService:
         )
 
         # Run chain - 只需要 title 和 description，返回字符串
-        summary = await SummaryGenerationChain.get_instance().generate(
-            title=request.title,
-            description=request.description,
-        )
-
-        # Create response
-        response = SummaryGenerateResponse(summary=summary)
+        response = await SummaryGenerationChain.get_instance().generate(request)
 
         logger.info(
             "商品摘要生成完成",
             extra={
                 "title": request.title[:50],
-                "summary_length": len(summary),
+                "summary_length": len(response.summary),
             },
         )
 
         return response
+
 
     @staticmethod
     async def generate_product_tags(
