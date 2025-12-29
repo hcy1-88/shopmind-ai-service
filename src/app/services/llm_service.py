@@ -4,9 +4,9 @@ from typing import Any, Optional
 
 from langchain_core.language_models import BaseChatModel
 
-from src.app.config.nacos_client import get_nacos_client
-from src.app.provider.llm_provider import OpenAIProvider, LLMProvider, TongyiProvider
-from src.app.utils.logger import app_logger as logger
+from app.config.nacos_client import get_nacos_client
+from app.provider.llm_provider import OpenAIProvider, LLMProvider, TongyiProvider
+from app.utils.logger import app_logger as logger
 
 
 class LLMService:

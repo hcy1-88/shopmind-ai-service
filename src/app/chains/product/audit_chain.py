@@ -12,15 +12,15 @@ from urllib.parse import urlparse
 from fastapi.exceptions import RequestValidationError
 from langchain_core.output_parsers import BaseOutputParser, PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from src.app.chains.product.base_ai_generator_chain import VisionAwareAIGenerator
-from src.app.schemas.product_audit import (
+from app.chains.product.base_ai_generator_chain import VisionAwareAIGenerator
+from app.schemas.product_audit import (
     ProductAuditRequest,
     ProductAuditResponse,
     CheckResult,
     ImageCheckResult,
 )
-from src.app.utils.image_util import load_image_from_url
-from src.app.utils.logger import app_logger as logger
+from app.utils.image_util import load_image_from_url
+from app.utils.logger import app_logger as logger
 
 
 class ProductAuditChain(VisionAwareAIGenerator[ProductAuditRequest, ProductAuditResponse]):

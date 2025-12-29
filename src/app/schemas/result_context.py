@@ -4,9 +4,9 @@ from typing import Generic, TypeVar, Optional, Dict, Any
 
 from pydantic import Field
 
-from src.app.schemas.base import CamelCaseModel
+from app.schemas.base import CamelCaseModel
 
-from src.app.utils.trace_context import get_trace_id
+from app.utils.trace_context import get_trace_id
 
 T = TypeVar("T")
 

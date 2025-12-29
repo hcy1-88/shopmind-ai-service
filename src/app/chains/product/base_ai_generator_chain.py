@@ -11,8 +11,8 @@ from typing import TypeVar, Generic
 
 from langchain_core.output_parsers import BaseOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from src.app.services.llm_service import get_llm_service
-from src.app.utils.image_util import load_image_from_url, is_base64_image
+from app.services.llm_service import get_llm_service
+from app.utils.image_util import load_image_from_url, is_base64_image
 
 # 泛型变量：Input = 子类的输入数据结构，Output = 子类的返回 Pydantic 模型
 InputType = TypeVar('InputType')

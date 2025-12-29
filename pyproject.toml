@@ -32,8 +32,6 @@ dependencies = [
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
-[tool.hatch.build.targets.wheel]
-packages = ["app"]
 
 [dependency-groups]
 dev = [
@@ -44,7 +42,9 @@ dev = [
 ]
 
 [tool.setuptools]
-package-dir = {"" = "src"}  # 包根目录在 src 下
+# src 布局配置：将 src 目录下的包作为顶级包
+# 这样 src/app 可以通过 "from app import ..." 导入
+package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]

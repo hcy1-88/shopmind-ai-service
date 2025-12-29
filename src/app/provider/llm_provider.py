@@ -6,7 +6,7 @@ from typing import Any
 from langchain_core.language_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 
-from src.app.utils.logger import app_logger as logger
+from app.utils.logger import app_logger as logger
 
 
 class LLMProvider(ABC):

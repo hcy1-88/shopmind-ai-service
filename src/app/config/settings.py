@@ -4,7 +4,7 @@ from typing import Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from src.app.utils.ip import get_local_ip
+from app.utils.ip import get_local_ip
 
 # 模块级别的单例实例（避免与 Pydantic 字段系统冲突）
 _settings_instance: Optional["Settings"] = None
@@ -75,10 +75,11 @@ class Settings(BaseSettings):
 
 
     # Milvus (优先 Nacos，若无 则取 .env 中的配置)
-    milvus_host: str = Field(default="localhost", description="Milvus host")
-    milvus_port: int = Field(default=19530, description="Milvus port")
-    milvus_user: Optional[str] = Field(default=None, description="Milvus user")
-    milvus_password: Optional[str] = Field(default=None, description="Milvus password")
+    milvus_uri: str = Field(default="localhost", description="Milvus host")
+    milvus_token: str = Field(
+        default="",
+        description="Milvus token",
+    )
     milvus_db_name: str = Field(default="default", description="Milvus database name")
 
 

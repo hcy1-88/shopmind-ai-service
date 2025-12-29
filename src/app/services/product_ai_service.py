@@ -1,20 +1,20 @@
 """商品 AI 辅助服务."""
-from src.app.chains.product.audit_chain import ProductAuditChain
-from src.app.chains.product.description_generator_chain import DescriptionGenerationChain
-from src.app.chains.product.summary_generator_chain import SummaryGenerationChain
-from src.app.chains.product.image_check_chain import ImageCheckChain
-from src.app.chains.product.tag_generator_chain import ProductTagGenChain
-from src.app.chains.product.title_check_chain import TitleCheckChain
-from src.app.schemas.product_audit import ProductAuditRequest, ProductAuditResponse
-from src.app.schemas.product_description import (
+from app.chains.product.audit_chain import ProductAuditChain
+from app.chains.product.description_generator_chain import DescriptionGenerationChain
+from app.chains.product.summary_generator_chain import SummaryGenerationChain
+from app.chains.product.image_check_chain import ImageCheckChain
+from app.chains.product.tag_generator_chain import ProductTagGenChain
+from app.chains.product.title_check_chain import TitleCheckChain
+from app.schemas.product_audit import ProductAuditRequest, ProductAuditResponse
+from app.schemas.product_description import (
     DescriptionGenerateRequest,
     DescriptionGenerateResponse,
 )
-from src.app.schemas.image_check import ImageCheckRequest, ImageCheckResponse
-from src.app.schemas.product_summary import SummaryGenerateRequest, SummaryGenerateResponse
-from src.app.schemas.product_tag import GenerateTagsRequest, GenerateTagsResponse
-from src.app.schemas.product_title_check import TitleCheckRequest, TitleCheckResponse
-from src.app.utils.logger import app_logger as logger
+from app.schemas.image_check import ImageCheckRequest, ImageCheckResponse
+from app.schemas.product_summary import SummaryGenerateRequest, SummaryGenerateResponse
+from app.schemas.product_tag import GenerateTagsRequest, GenerateTagsResponse
+from app.schemas.product_title_check import TitleCheckRequest, TitleCheckResponse
+from app.utils.logger import app_logger as logger
 
 
 class ProductAIService:

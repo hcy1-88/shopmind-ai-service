@@ -6,7 +6,7 @@
 @Author     : hcy18
 """
 import socket
-from src.app.utils.logger import app_logger as logger
+from app.utils.logger import app_logger as logger
 
 def get_local_ip():
     """获取本机内网 IP（非 127.0.0.1）"""

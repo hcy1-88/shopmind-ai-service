@@ -3,7 +3,7 @@
 from decimal import Decimal
 from pydantic import Field
 
-from src.app.schemas.base import CamelCaseModel
+from app.schemas.base import CamelCaseModel
 
 
 class SummaryGenerateRequest(CamelCaseModel):

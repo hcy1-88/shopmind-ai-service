@@ -5,7 +5,7 @@ import sys
 
 from pythonjsonlogger import json
 
-from src.app.utils.trace_context import get_trace_id
+from app.utils.trace_context import get_trace_id
 
 APP_LOGGER_NAME = "shopmind_ai_service"
 

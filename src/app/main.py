@@ -6,13 +6,13 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from src.app.config import get_settings
-from src.app.config.nacos_client import get_nacos_client
-from src.app.middleware.trace_middleware import TraceIDMiddleware
-from src.app.routers import ai_product_router
-from src.app.schemas.result_context import ResultContext
-from src.app.utils.logger import app_logger as logger
-from src.app.utils.logger import setup_logger
+from app.config import get_settings
+from app.config.nacos_client import get_nacos_client
+from app.middleware.trace_middleware import TraceIDMiddleware
+from app.routers import ai_product_router
+from app.schemas.result_context import ResultContext
+from app.utils.logger import app_logger as logger
+from app.utils.logger import setup_logger
 
 
 @asynccontextmanager
@@ -38,7 +38,7 @@ async def lifespan(app: FastAPI):
         await nacos_client.connect()
 
         # 初始化 LLM 服务
-        from src.app.services.llm_service import get_llm_service
+        from app.services.llm_service import get_llm_service
         llm_service = get_llm_service()
         logger.info("LLM service 初始化成功，提供商：%s！", llm_service.provider_name)
 

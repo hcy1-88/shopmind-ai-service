@@ -3,7 +3,7 @@
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
-from src.app.utils.trace_context import extract_trace_id_from_request, set_trace_id
+from app.utils.trace_context import extract_trace_id_from_request, set_trace_id
 
 
 class TraceIDMiddleware(BaseHTTPMiddleware):

@@ -7,8 +7,8 @@ from typing import Any, Optional
 from v2.nacos import ClientConfigBuilder, GRPCConfig, NacosConfigService, NacosNamingService, ClientConfig, ConfigParam, \
     RegisterInstanceParam, DeregisterInstanceParam
 
-from src.app.config.settings import Settings, get_settings
-from src.app.utils.logger import app_logger as logger
+from app.config.settings import Settings, get_settings
+from app.utils.logger import app_logger as logger
 
 
 class NacosClient:
@@ -221,10 +221,8 @@ class NacosClient:
             return nacos_config[NAME]
 
         return {
-            "host": self.settings.milvus_host,
-            "port": self.settings.milvus_port,
-            "user": self.settings.milvus_user,
-            "password": self.settings.milvus_password,
+            "uri": self.settings.milvus_uri,
+            "token": self.settings.milvus_token,
             "db_name": self.settings.milvus_db_name,
         }
 

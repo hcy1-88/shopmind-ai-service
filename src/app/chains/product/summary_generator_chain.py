@@ -7,8 +7,8 @@
 """
 from typing import Optional
 from langchain_core.output_parsers import BaseOutputParser, PydanticOutputParser
-from src.app.chains.product.base_ai_generator_chain import VisionAwareAIGenerator, InputType
-from src.app.schemas import SummaryGenerateRequest, SummaryGenerateResponse
+from app.chains.product.base_ai_generator_chain import VisionAwareAIGenerator, InputType
+from app.schemas import SummaryGenerateRequest, SummaryGenerateResponse
 
 
 class SummaryGenerationChain(VisionAwareAIGenerator[SummaryGenerateRequest, SummaryGenerateResponse]):

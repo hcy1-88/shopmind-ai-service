@@ -2,18 +2,18 @@
 
 from fastapi import APIRouter
 
-from src.app.schemas.product_audit import ProductAuditResponse, ProductAuditRequest
-from src.app.schemas.product_description import (
+from app.schemas.product_audit import ProductAuditResponse, ProductAuditRequest
+from app.schemas.product_description import (
     DescriptionGenerateRequest,
     DescriptionGenerateResponse,
 )
-from src.app.schemas.image_check import ImageCheckRequest, ImageCheckResponse
-from src.app.schemas.product_tag import GenerateTagsResponse, GenerateTagsRequest
-from src.app.schemas.result_context import ResultContext
-from src.app.schemas.product_summary import SummaryGenerateRequest, SummaryGenerateResponse
-from src.app.schemas.product_title_check import TitleCheckRequest, TitleCheckResponse
-from src.app.services.product_ai_service import ProductAIService
-from src.app.utils.logger import app_logger as logger
+from app.schemas.image_check import ImageCheckRequest, ImageCheckResponse
+from app.schemas.product_tag import GenerateTagsResponse, GenerateTagsRequest
+from app.schemas.result_context import ResultContext
+from app.schemas.product_summary import SummaryGenerateRequest, SummaryGenerateResponse
+from app.schemas.product_title_check import TitleCheckRequest, TitleCheckResponse
+from app.services.product_ai_service import ProductAIService
+from app.utils.logger import app_logger as logger
 
 # Create router
 router = APIRouter(
