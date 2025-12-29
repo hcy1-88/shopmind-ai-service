@@ -1,9 +1,11 @@
 """商品 AI 辅助服务."""
+from app.chains.product.audit_chain import ProductAuditChain
 from app.chains.product.description_generator_chain import DescriptionGenerationChain
 from app.chains.product.summary_generator_chain import SummaryGenerationChain
 from app.chains.product.image_check_chain import ImageCheckChain
 from app.chains.product.tag_generator_chain import ProductTagGenChain
 from app.chains.product.title_check_chain import TitleCheckChain
+from app.schemas.product_audit import ProductAuditRequest, ProductAuditResponse
 from app.schemas.product_description import (
     DescriptionGenerateRequest,
     DescriptionGenerateResponse,
@@ -154,4 +156,11 @@ class ProductAIService:
         """
         res = await ProductTagGenChain.get_instance().generate(request)
         logger.info("商品标签生成完毕，商品 id：%s", request.product_id)
+        return res
+
+    @staticmethod
+    async def audit_product(request: ProductAuditRequest) -> ProductAuditResponse:
+        """审核商品"""
+        res = await ProductAuditChain.get_instance().generate(request)
+        logger.info(f"商品 id：{request.product_id} 审核完毕，审核状态为：{res.audit_status}")
         return res

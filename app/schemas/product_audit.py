@@ -109,7 +109,3 @@ class ProductAuditResponse(CamelCaseModel):
         default_factory=list,
         description="修改建议",
     )
-    audit_time: datetime = Field(
-        ...,
-        description="审核时间",
-    )

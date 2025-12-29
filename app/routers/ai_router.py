@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter
 
+from app.schemas.product_audit import ProductAuditResponse, ProductAuditRequest
 from app.schemas.product_description import (
     DescriptionGenerateRequest,
     DescriptionGenerateResponse,
@@ -192,3 +193,16 @@ async def generate_product_tags(
     return ResultContext.ok(
         data=response, message="商品标签生成完成"
     )
+
+
+@router.post(
+    "/audit/product",
+    response_model=ResultContext[ProductAuditResponse],
+    summary="商品AI审核",
+    description="审核商品的标题、描述、封面图、详情图"
+)
+async def audit_product(request: ProductAuditRequest) -> ResultContext[ProductAuditResponse]:
+    """审核商品"""
+    logger.info(f"请求商品审核，商品 id：{request.product_id}")
+    response = await ProductAIService.audit_product(request)
+    return ResultContext.ok(data=response, message="AI审核完成")
