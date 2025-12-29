@@ -17,7 +17,7 @@ from app.utils.logger import app_logger as logger
 
 # Create router
 router = APIRouter(
-    prefix="/ai",
+    prefix="/ai/product",
     tags=["AI Services"],
 )
 
@@ -134,7 +134,7 @@ async def generate_description(
 
 
 @router.post(
-    "/generate/product-summary",
+    "/generate/summary",
     response_model=ResultContext[SummaryGenerateResponse],
     summary="生成商品摘要",
     description="根据完整的商品信息（标题、描述）生成简洁摘要",
@@ -168,7 +168,7 @@ async def generate_summary(
 
 
 @router.post(
-    "/generate/product-tags",
+    "/generate/tags",
     response_model=ResultContext[GenerateTagsResponse],
     summary="生成商品标签",
     description="根据商品标题和描述，生成商品展示标签"
@@ -196,7 +196,7 @@ async def generate_product_tags(
 
 
 @router.post(
-    "/audit/product",
+    "/audit",
     response_model=ResultContext[ProductAuditResponse],
     summary="商品AI审核",
     description="审核商品的标题、描述、封面图、详情图"

@@ -13,7 +13,7 @@ from app.config.nacos_client import get_nacos_client
 # from app.db import close_db, init_db
 from app.middleware.trace_middleware import TraceIDMiddleware
 # from app.mq import close_rocketmq, init_rocketmq
-from app.routers import ai_router
+from app.routers import ai_product_router
 from app.schemas.result_context import ResultContext
 from app.utils.logger import app_logger as logger
 from app.utils.logger import setup_logger
