@@ -29,8 +29,8 @@ dependencies = [
 ]
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
@@ -42,3 +42,9 @@ dev = [
     "black>=24.10.0",
     "ruff>=0.8.4",
 ]
+
+[tool.setuptools]
+package-dir = {"" = "src"}  # 包根目录在 src 下
+
+[tool.setuptools.packages.find]
+where = ["src"]
