@@ -23,12 +23,12 @@ class ImageCheckChain(VisionAwareAIGenerator[ImageCheckRequest, ImageCheckRespon
         """视觉模式的系统提示"""
         return """你是一个专业的电商平台图片审核专家。请审核这张商品图片是否符合平台规范。
 
-审核标准：
-1. 不能包含色情、暴力、血腥内容
-2. 不能包含政治敏感而引起对立的内容，但可使用"政府补贴"、"政府补助"、"消费补贴"、"以旧换新补贴"等营销表述
-3. 不能包含虚假宣传或误导性内容
-4. 不能包含恶意广告或水印
-5. 图片应清晰、真实地展示商品"""
+        审核标准：
+        1. 不能包含色情、暴力、血腥内容
+        2. 不能包含政治敏感而引起对立的内容，但可使用"政府补贴"、"政府补助"、"消费补贴"、"以旧换新补贴"等营销表述
+        3. 不能包含虚假宣传或误导性内容
+        4. 图片应清晰、真实地展示商品
+        """
 
 
     def _build_vision_human_message_base_text(self, input_data: ImageCheckRequest) -> str:
