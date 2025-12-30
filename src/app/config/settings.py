@@ -74,49 +74,6 @@ class Settings(BaseSettings):
     )
 
 
-    # Milvus (优先 Nacos，若无 则取 .env 中的配置)
-    milvus_uri: str = Field(default="localhost", description="Milvus host")
-    milvus_token: str = Field(
-        default="",
-        description="Milvus token",
-    )
-    milvus_db_name: str = Field(default="default", description="Milvus database name")
-
-
-    # LLM Configuration (优先 Nacos，若无 则取 .env 中的配置)
-    llm_provider: str = Field(
-        default="openai",
-        description="LLM provider (openai, tongyi, etc.)",
-    )
-    openai_api_key: Optional[str] = Field(
-        default=None,
-        description="OpenAI API key",
-    )
-    openai_api_base: Optional[str] = Field(
-        default=None,
-        description="OpenAI API base URL",
-    )
-    openai_model: str = Field(
-        default="gpt-4o-mini",
-        description="OpenAI model name",
-    )
-    openai_vision_model: str = Field(
-        default="gpt-4o",
-        description="OpenAI vision model name",
-    )
-    llm_temperature: float = Field(
-        default=0.7,
-        description="LLM temperature",
-    )
-    llm_max_tokens: int = Field(
-        default=2000,
-        description="LLM max tokens",
-    )
-    llm_timeout: int = Field(
-        default=60,
-        description="LLM request timeout in seconds",
-    )
-
     @classmethod
     def get_instance(cls) -> "Settings":
         """

@@ -107,3 +107,7 @@ def get_llm_service() -> LLMService:
     """
     return LLMService.get_instance()
 
+
+async def init_llm_service() -> None:
+    llm_service = get_llm_service()
+    logger.info(f"大语言模型初始化成功！提供商：{llm_service.provider_name}")

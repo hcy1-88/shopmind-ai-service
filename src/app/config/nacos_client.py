@@ -177,37 +177,6 @@ class NacosClient:
         return self.config_from_nacos
 
 
-    def get_postgres_config(self) -> dict[str, Any]:
-        """
-        获取 PostgreSQL 配置. 优先从 nacos，若无则从 settings，也就是 .env
-        格式：yaml
-            postgresql:
-              host: localhost
-              port: 5432
-              user: postgres
-              password: hcy991002
-              database: shopmind-dev
-              pool_size: 10
-              max_overflow: 20
-        Returns:
-            PostgreSQL configuration
-        """
-        nacos_config = self.config_from_nacos
-        NAME = "postgresql"
-        if NAME in nacos_config:
-            return nacos_config[NAME]
-
-        # 回退到 settings 的默认配置
-        return {
-            "host": self.settings.postgres_host,
-            "port": self.settings.postgres_port,
-            "user": self.settings.postgres_user,
-            "password": self.settings.postgres_password,
-            "database": self.settings.postgres_db,
-            "pool_size": self.settings.postgres_pool_size,
-            "max_overflow": self.settings.postgres_max_overflow,
-        }
-
     def get_milvus_config(self) -> dict[str, Any]:
         """
         获取 Milvus 配置. 优先从 nacos，若无则从 settings，也就是 .env
@@ -219,31 +188,8 @@ class NacosClient:
         NAME = "milvus"
         if NAME in nacos_config:
             return nacos_config[NAME]
+        raise ValueError("Milvus 配置项缺失，服务启动失败！")
 
-        return {
-            "uri": self.settings.milvus_uri,
-            "token": self.settings.milvus_token,
-            "db_name": self.settings.milvus_db_name,
-        }
-
-    def get_rocketmq_config(self) -> dict[str, Any]:
-        """
-        获取 RocketMQ 配置. 优先从 nacos，若无则从 settings，也就是 .env
-
-        Returns:
-            RocketMQ configuration
-        """
-        nacos_config = self.config_from_nacos
-        NAME = "rocketmq"
-        if NAME in nacos_config:
-            return nacos_config[NAME]
-
-        return {
-            "namesrv_addr": self.settings.rocketmq_namesrv_addr,
-            "access_key": self.settings.rocketmq_access_key,
-            "secret_key": self.settings.rocketmq_secret_key,
-            "group_id": self.settings.rocketmq_group_id,
-        }
 
     def get_llm_config(self) -> dict[str, Any]:
         """
@@ -256,20 +202,16 @@ class NacosClient:
         NAME = "llm"
         if NAME in nacos_config:
             return nacos_config[NAME]
+        raise ValueError("LLM 配置项缺失，服务启动失败！")
 
-        return {
-            "provider": self.settings.llm_provider,
-            "openai": {
-                "api_key": self.settings.openai_api_key,
-                "api_base": self.settings.openai_api_base,
-                "model": self.settings.openai_model,
-                "vision_model": self.settings.openai_vision_model,
-            },
-            "temperature": self.settings.llm_temperature,
-            "max_tokens": self.settings.llm_max_tokens,
-            "timeout": self.settings.llm_timeout,
-        }
 
+    def get_embedding_config(self) -> dict[str, Any]:
+        """获取嵌入模型的配置"""
+        nacos_config = self.config_from_nacos
+        NAME = "embedding"
+        if NAME in nacos_config:
+            return nacos_config[NAME]
+        raise ValueError("嵌入模型 配置缺失，服务启动失败！")
 
 
 def get_nacos_client(settings: Optional[Settings] = None) -> NacosClient:
@@ -284,3 +226,8 @@ def get_nacos_client(settings: Optional[Settings] = None) -> NacosClient:
         NacosClient 单例实例
     """
     return NacosClient.get_instance(settings=settings)
+
+
+async def init_nacos(settings: Settings):
+    nacos_client = get_nacos_client(settings)
+    await nacos_client.connect()

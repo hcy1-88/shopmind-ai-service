@@ -102,13 +102,8 @@ class TongyiProvider(LLMProvider):
 
     def get_chat_model(self, **kwargs) -> BaseChatModel:
         """Get Tongyi chat model."""
-        # TODO: Implement Tongyi chat model integration
-        # For now, fall back to OpenAI-compatible API
-        logger.warning("Tongyi provider not fully implemented, using OpenAI fallback")
         return OpenAIProvider(self.config).get_chat_model(**kwargs)
 
     def get_vision_model(self, **kwargs) -> BaseChatModel:
         """Get Tongyi vision model."""
-        # TODO: Implement Tongyi vision model integration
-        logger.warning("Tongyi provider not fully implemented, using OpenAI fallback")
         return OpenAIProvider(self.config).get_vision_model(**kwargs)

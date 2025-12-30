@@ -79,10 +79,7 @@ class ProductAuditRequest(CamelCaseModel):
         ...,
         description="详情图片 URL 列表",
     )
-    category_id: int = Field(
-        ...,
-        description="商品分类 ID",
-    )
+
 
 
 class ProductAuditResponse(CamelCaseModel):

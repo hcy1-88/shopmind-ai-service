@@ -1,18 +1,22 @@
 """FastAPI application main entry point."""
 
 import logging
+import sys
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.config import get_settings
-from app.config.nacos_client import get_nacos_client
+from app.config.nacos_client import get_nacos_client, init_nacos
 from app.middleware.trace_middleware import TraceIDMiddleware
 from app.routers import ai_product_router
 from app.schemas.result_context import ResultContext
+from app.services.embedding_service import init_embedding_service
+from app.services.llm_service import init_llm_service
 from app.utils.logger import app_logger as logger
 from app.utils.logger import setup_logger
+from app.vector_store import init_milvus
 
 
 @asynccontextmanager
@@ -34,21 +38,34 @@ async def lifespan(app: FastAPI):
         logger.info("正在启动 Shopmind AI service...")
 
         # nacos 初始化
-        nacos_client = get_nacos_client(settings)
-        await nacos_client.connect()
+        await init_nacos(settings)
 
         # 初始化 LLM 服务
-        from app.services.llm_service import get_llm_service
-        llm_service = get_llm_service()
-        logger.info("LLM service 初始化成功，提供商：%s！", llm_service.provider_name)
+        await init_llm_service()
 
+        # 初始化 Embedding 服务
+        init_embedding_service()
 
-        # # 初始化 Milvus
-        # await init_milvus()
-        # logger.info("Milvus initialized")
-
+        # 初始化 Milvus
+        init_milvus()
 
         logger.info("Shopmind AI service 启动成功！")
+
+        # ===== 新增：打印服务启动 Banner =====
+        service_name = "ShopMind AI Service"
+        host = settings.service_ip
+        port = settings.service_port
+        url = f"http://{host}:{port}"
+
+        banner = f"""
+        {'=' * 60}
+        🚀 {service_name} 已启动！
+        🔗 访问地址: {url}
+        🌐 Host: {host}
+        🚪 Port: {port}
+        {'=' * 60}
+        """
+        print(banner, file=sys.stderr)
 
     except Exception as e:
         logger.error(f"Failed to start AI service: {e}")
@@ -65,12 +82,13 @@ async def lifespan(app: FastAPI):
         await nacos_client.deregister_service()
         logger.info("Nacos service deregistered")
 
-        #
-        # # Close Milvus
-        # await close_milvus()
-        # logger.info("Milvus closed")
+        # Close Milvus
+        from app.vector_store.milvus_client import MilvusClient
+        milvus_client = MilvusClient.get_instance()
+        await milvus_client.close()
+        logger.info("Milvus closed")
 
-        logger.info("AI service shutdown complete")
+        logger.info("Shopmind AI service 已关闭...")
 
     except Exception as e:
         logger.error(f"Error during shutdown: {e}")
@@ -171,6 +189,8 @@ async def health() -> ResultContext[dict]:
     )
 
 
+from fastapi import Request
+
 if __name__ == "__main__":
     import uvicorn
 
@@ -181,4 +201,5 @@ if __name__ == "__main__":
         port=settings.service_port,
         reload=settings.debug,
         log_level=settings.log_level.lower(),
+        http="h11"
     )

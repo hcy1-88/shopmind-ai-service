@@ -12,7 +12,9 @@ from app.schemas.product_tag import GenerateTagsResponse, GenerateTagsRequest
 from app.schemas.result_context import ResultContext
 from app.schemas.product_summary import SummaryGenerateRequest, SummaryGenerateResponse
 from app.schemas.product_title_check import TitleCheckRequest, TitleCheckResponse
+from app.schemas.product_vectorize import VectorizeProductRequest, VectorizeProductResponse
 from app.services.product_ai_service import ProductAIService
+from app.services.product_vectorize_service import ProductVectorizeService
 from app.utils.logger import app_logger as logger
 
 # Create router
@@ -206,3 +208,29 @@ async def audit_product(request: ProductAuditRequest) -> ResultContext[ProductAu
     logger.info(f"请求商品审核，商品 id：{request.product_id}")
     response = await ProductAIService.audit_product(request)
     return ResultContext.ok(data=response, message="AI审核完成")
+
+
+
+@router.post(
+    "/vectorize",
+    response_model=ResultContext[VectorizeProductResponse],
+    summary="商品向量化",
+    description="将商品信息向量化并存储到 Milvus 向量数据库"
+)
+async def vectorize_product(request: VectorizeProductRequest) -> ResultContext[VectorizeProductResponse]:
+    """
+    商品向量化
+    
+    将商品的标题、描述、AI摘要、标签组合后进行向量化，并存储到 Milvus。
+    """
+    logger.info(f"请求商品向量化，product_id: {request.product_id}")
+    response = await ProductVectorizeService.vectorize_product(request)
+    
+    if response.success:
+        return ResultContext.ok(data=response, message="商品向量化成功")
+    else:
+        return ResultContext.fail(
+            data=response,
+            message=f"商品向量化失败: {response.error_message}",
+            code="VECTORIZE_ERROR"
+        )

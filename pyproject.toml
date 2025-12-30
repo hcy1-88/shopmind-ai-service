@@ -26,6 +26,7 @@ dependencies = [
    "python-json-logger",
    "tenacity",
    "nacos-sdk-python",
+   "dashscope>=1.25.5",
 ]
 
 [build-system]
