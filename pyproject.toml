@@ -7,11 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
    "fastapi",
    "uvicorn[standard]",
-   "sqlalchemy[asyncio]",
-   "asyncpg",
-   "psycopg2-binary",
    "pymilvus",
-   "rocketmq-client-python",
    "langchain",
    "langchain-openai",
    "langchain-community",
