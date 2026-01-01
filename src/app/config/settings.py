@@ -54,7 +54,7 @@ class Settings(BaseSettings):
 
     # Service Registration
     service_name: str = Field(
-        default="ai-service",
+        default="shopmind-ai-service",
         description="Service name for registration",
     )
     service_ip: str = Field(
