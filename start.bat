@@ -36,8 +36,6 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo [INFO] Starting service (development mode)...
-echo    API Docs: http://localhost:8000/docs
-echo    Health Check: http://localhost:8000/health
 echo.
 
 REM Change to script directory to ensure correct working directory
@@ -47,6 +45,6 @@ REM Set PYTHONPATH to include project root
 set PYTHONPATH=%CD%;%PYTHONPATH%
 
 REM Use python -m uvicorn instead of direct uvicorn command
-uv run python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uv run python -m uvicorn app.main:app --reload 
 
 pause
