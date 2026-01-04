@@ -1,6 +1,7 @@
 """商品 AI 辅助服务."""
 from app.chains.product.audit_chain import ProductAuditChain
 from app.chains.product.description_generator_chain import DescriptionGenerationChain
+from app.chains.product.search_keyword_chain import SearchKeywordEnhanceChain
 from app.chains.product.summary_generator_chain import SummaryGenerationChain
 from app.chains.product.image_check_chain import ImageCheckChain
 from app.chains.product.tag_generator_chain import ProductTagGenChain
@@ -14,6 +15,7 @@ from app.schemas.image_check import ImageCheckRequest, ImageCheckResponse
 from app.schemas.product_summary import SummaryGenerateRequest, SummaryGenerateResponse
 from app.schemas.product_tag import GenerateTagsRequest, GenerateTagsResponse
 from app.schemas.product_title_check import TitleCheckRequest, TitleCheckResponse
+from app.schemas.search_schema import SearchKeyWordEnhanceRequest, SearchKeywordEnhanceResponse
 from app.utils.logger import app_logger as logger
 
 
@@ -163,4 +165,12 @@ class ProductAIService:
         """审核商品"""
         res = await ProductAuditChain.get_instance().generate(request)
         logger.info(f"商品 id：{request.product_id} 审核完毕，审核状态为：{res.audit_status}")
+        return res
+
+
+    @staticmethod
+    async def enhance_keyword(request: SearchKeyWordEnhanceRequest) -> SearchKeywordEnhanceResponse:
+        """增强搜索词"""
+        res = await SearchKeywordEnhanceChain.get_instance().generate(request)
+        logger.info(f"用户搜索词: {request.keyword}， 增强后：{res.core_words} and {res.expand_words}")
         return res

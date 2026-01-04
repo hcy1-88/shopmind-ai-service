@@ -13,6 +13,7 @@ from app.schemas.result_context import ResultContext
 from app.schemas.product_summary import SummaryGenerateRequest, SummaryGenerateResponse
 from app.schemas.product_title_check import TitleCheckRequest, TitleCheckResponse
 from app.schemas.product_vectorize import VectorizeProductRequest, VectorizeProductResponse
+from app.schemas.search_schema import SearchKeyWordEnhanceRequest, SearchKeywordEnhanceResponse
 from app.services.product_ai_service import ProductAIService
 from app.services.product_vectorize_service import ProductVectorizeService
 from app.utils.logger import app_logger as logger
@@ -234,3 +235,17 @@ async def vectorize_product(request: VectorizeProductRequest) -> ResultContext[V
             message=f"商品向量化失败: {response.error_message}",
             code="VECTORIZE_ERROR"
         )
+
+
+@router.post(
+"/enhance/search-keyword",
+    response_model=ResultContext[SearchKeywordEnhanceResponse],
+    summary="增强用户的搜索词",
+    description="最用户输入的搜索词进行增强，变成更容易搜索出商品的句子"
+)
+async def enhance_search_keyword(request: SearchKeyWordEnhanceRequest) -> ResultContext[SearchKeywordEnhanceResponse]:
+    """
+    关键词增强
+    """
+    response = await ProductAIService.enhance_keyword(request)
+    return ResultContext.ok(data=response, message="搜索词增强成功")
