@@ -222,6 +222,16 @@ class NacosClient:
             return nacos_config[NAME]
         raise ValueError("redis 配置项缺失，服务启动失败！")
 
+    
+    def get_chat_config(self) -> dict[str, Any]:
+        """获取 chat 配置"""
+        nacos_config = self.config_from_nacos
+        NAME = "chat"
+        if NAME in nacos_config:
+            return nacos_config[NAME]
+        raise ValueError("redis 配置项缺失，服务启动失败！")
+
+
 def get_nacos_client(settings: Optional[Settings] = None) -> NacosClient:
     """
     获取 NacosClient 单例实例.

@@ -5,6 +5,7 @@ from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langgraph.graph import START, MessagesState, StateGraph
 
+from app.config.nacos_client import get_nacos_client
 from app.schemas.ai_ask_schema import AIAskRequest
 from app.services import llm_service
 from app.checkpoints import get_redis_checkpoint_saver
@@ -27,8 +28,10 @@ class AIChatService:
     
     def __init__(self):
         """初始化 AI 对话服务"""
-        # Redis 短期记忆，2小时过期
-        self.checkpointer = get_redis_checkpoint_saver(ttl=7200)
+        # Redis 短期记忆，ttl 个小时过期
+        chat_config = get_nacos_client().get_chat_config()
+        ttl = chat_config.get("checkpoint_expire", 2)
+        self.checkpointer = get_redis_checkpoint_saver(ttl=ttl*3600)
         
         # 创建对话提示词模板
         self.prompt = ChatPromptTemplate.from_messages([
