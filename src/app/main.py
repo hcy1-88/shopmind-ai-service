@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from app.clients.redis_client import get_redis_client
 from app.config import get_settings
 from app.config.nacos_client import get_nacos_client, init_nacos
 from app.middleware.trace_middleware import TraceIDMiddleware
@@ -49,6 +50,11 @@ async def lifespan(app: FastAPI):
         # 初始化 Milvus
         init_milvus()
 
+         # 初始化 Redis
+        redis_client = get_redis_client()
+        await redis_client.connect()
+        logger.info("Redis 初始化完成")
+
         logger.info("Shopmind AI service 启动成功！")
 
         # ===== 新增：打印服务启动 Banner =====
@@ -87,6 +93,11 @@ async def lifespan(app: FastAPI):
         milvus_client = MilvusClient.get_instance()
         await milvus_client.close()
         logger.info("Milvus closed")
+
+        # 关闭 Redis
+        redis_client = get_redis_client()
+        await redis_client.close()
+        logger.info("Redis 连接已关闭")
 
         logger.info("Shopmind AI service 已关闭...")
 

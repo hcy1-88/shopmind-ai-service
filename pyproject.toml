@@ -23,6 +23,7 @@ dependencies = [
    "tenacity",
    "nacos-sdk-python",
    "dashscope>=1.25.5",
+   "redis>=7.1.0",
 ]
 
 [build-system]
