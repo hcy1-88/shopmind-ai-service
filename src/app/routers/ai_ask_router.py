@@ -1,0 +1,121 @@
+"""AI 对话路由"""
+
+from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
+
+from app.schemas.ai_ask_schema import AIAskRequest, AIClearHistoryRequest
+from app.schemas.result_context import ResultContext
+from app.services.ai_chat_service import get_ai_chat_service
+from app.utils.logger import app_logger as logger
+
+
+router = APIRouter(prefix="/ai", tags=["大模型对话"])
+
+
+@router.post(
+    "/chat",
+    summary="大模型对话（流式）",
+    description="""
+    大模型对话接口，支持流式输出和短期记忆。
+    
+    参数说明：
+    - question: 用户的问题（必填）
+    - user_id: 用户ID（可选，用于区分不同用户）
+    - session_id: 会话ID（可选，用于支持多会话并存）
+        - 如果传递 session_id，则使用独立会话
+        - 如果不传，则使用该用户的默认会话
+        - 不同的 session_id 对应不同的对话历史，互不影响
+    
+    返回：
+    - 流式输出 AI 回复的文本内容（text/plain 格式）
+    """,
+)
+async def chat(request: AIAskRequest):
+    """
+    大模型对话（流式输出，带短期记忆）
+    """
+    try:
+        logger.info(
+            "收到对话请求",
+            extra={
+                "user_id": request.user_id,
+                "session_id": request.session_id,
+                "question": request.question,
+            }
+        )
+        
+        # 获取对话服务
+        chat_service = get_ai_chat_service()
+        
+        # 返回流式响应
+        return StreamingResponse(
+            chat_service.chat_stream(request),
+            media_type="text/plain; charset=utf-8"
+        )
+        
+    except Exception as e:
+        logger.error(f"对话请求处理失败: {e}", exc_info=True)
+        # 流式输出错误信息
+        async def error_stream():
+            yield f"抱歉，处理您的请求时出现错误：{str(e)}"
+        
+        return StreamingResponse(
+            error_stream(),
+            media_type="text/plain; charset=utf-8",
+            status_code=500
+        )
+
+
+@router.post(
+    "/clear-history",
+    response_model=ResultContext[dict],
+    summary="清除对话历史",
+    description="""
+    清除对话历史记录。
+    
+    参数说明：
+    - user_id: 用户ID（可选）
+    - session_id: 会话ID（可选）
+        - 如果传递 session_id，则只清除该会话的历史
+        - 如果不传 session_id，则清除该用户的所有会话历史
+    
+    使用场景：
+    - 前端提供"清除对话"按钮，点击后调用此接口
+    - 用户切换会话时，可以清除旧会话
+    """,
+)
+async def clear_history(request: AIClearHistoryRequest) -> ResultContext[dict]:
+    """
+    清除对话历史
+    """
+    try:
+        logger.info(
+            "收到清除历史请求",
+            extra={
+                "session_id": request.session_id
+            }
+        )
+        
+        # 获取对话服务
+        chat_service = get_ai_chat_service()
+        
+        # 清除历史
+        success = await chat_service.clear_history(session_id=request.session_id)
+        
+        if success:
+            return ResultContext.ok(
+                data={"cleared": True},
+                message="对话历史已清除"
+            )
+        else:
+            return ResultContext.fail(
+                message="清除对话历史失败",
+                code="CLEAR_FAILED"
+            )
+            
+    except Exception as e:
+        logger.error(f"清除历史失败: {e}", exc_info=True)
+        return ResultContext.fail(
+            message=f"清除历史失败: {str(e)}",
+            code="CLEAR_ERROR"
+        )

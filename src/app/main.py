@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from app.config import get_settings
 from app.config.nacos_client import get_nacos_client, init_nacos
 from app.middleware.trace_middleware import TraceIDMiddleware
-from app.routers import ai_product_router
+from app.routers import ai_ask_router, ai_product_router
 from app.schemas.result_context import ResultContext
 from app.services.embedding_service import init_embedding_service
 from app.services.llm_service import init_llm_service
@@ -160,6 +160,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 # Include routers
 app.include_router(ai_product_router.router)
+app.include_router(ai_ask_router.router)
 
 
 # Root endpoint
