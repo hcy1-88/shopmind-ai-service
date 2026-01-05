@@ -3,11 +3,11 @@
 from typing import AsyncGenerator, Optional
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import START, MessagesState, StateGraph
 
 from app.schemas.ai_ask_schema import AIAskRequest
 from app.services import llm_service
+from app.checkpoints import get_redis_checkpoint_saver
 from app.utils.logger import app_logger as logger
 
 
@@ -16,20 +16,19 @@ class AIChatService:
     AI 对话服务（单例模式）
     
     架构说明：
-    1. MemorySaver 是单例的，所有用户共享同一个实例
-    2. 通过 thread_id 来区分不同用户/会话，实现多用户隔离
-    3. thread_id 生成规则：
-       - 如果前端传递 session_id，则使用 f"{user_id}:{session_id}"
-       - 如果不传 session_id，则使用 f"{user_id}:default"
+    1. Redis Checkpoint 存储，所有用户共享同一个实例
+    2. 通过 thread_id（即 session_id）来区分不同会话，实现多会话隔离
+    3. thread_id = session_id（前端传递）
     4. 支持流式输出和对话历史管理
+    5. 消息历史默认 2 小时过期
     """
     
     _instance: Optional["AIChatService"] = None
     
     def __init__(self):
         """初始化 AI 对话服务"""
-        # 内存型短期记忆，单例共享
-        self.checkpointer = MemorySaver()
+        # Redis 短期记忆，2小时过期
+        self.checkpointer = get_redis_checkpoint_saver(ttl=7200)
         
         # 创建对话提示词模板
         self.prompt = ChatPromptTemplate.from_messages([
@@ -137,30 +136,39 @@ class AIChatService:
         清除对话历史
         
         Args:
-            user_id: 用户ID
-            session_id: 会话ID，如果不传则清除该用户的所有会话
+            session_id: 会话ID（即 thread_id）
             
         Returns:
             是否清除成功
         """
         try:
-            # 清除指定会话
             thread_id = session_id
-            # MemorySaver 没有直接的删除方法，我们通过创建空的 checkpoint 来清除
-            # 注意：MemorySaver 的实现中，我们需要直接操作内部存储
-            if hasattr(self.checkpointer, 'storage'):
-                # 清除指定 thread_id 的所有数据
-                keys_to_delete = [k for k in self.checkpointer.storage.keys() if k[0] == thread_id]
-                for key in keys_to_delete:
-                    del self.checkpointer.storage[key]
+            success = await self.checkpointer.clear_thread_history(thread_id)
+            if success:
                 logger.info(f"已清除会话历史: {thread_id}")
-                return True
-            else:
-                logger.warning("无法清除历史：checkpointer 没有 storage 属性")
-                return False
+            return success
         except Exception as e:
             logger.error(f"清除对话历史失败: {e}", exc_info=True)
             return False
+    
+    async def get_history(self, session_id: str) -> list[dict]:
+        """
+        获取对话历史
+        
+        Args:
+            session_id: 会话ID（即 thread_id）
+            
+        Returns:
+            消息历史列表
+        """
+        try:
+            thread_id = session_id
+            messages = await self.checkpointer.get_thread_messages(thread_id)
+            logger.info(f"获取会话历史: {thread_id}, 消息数量: {len(messages)}")
+            return messages
+        except Exception as e:
+            logger.error(f"获取对话历史失败: {e}", exc_info=True)
+            return []
     
 
 

@@ -9,11 +9,11 @@ from app.services.ai_chat_service import get_ai_chat_service
 from app.utils.logger import app_logger as logger
 
 
-router = APIRouter(prefix="/ai", tags=["大模型对话"])
+router = APIRouter(prefix="/ai/chat", tags=["大模型对话"])
 
 
 @router.post(
-    "/chat",
+    "",
     summary="大模型对话（流式）",
     description="""
     大模型对话接口，支持流式输出和短期记忆。
@@ -66,6 +66,53 @@ async def chat(request: AIAskRequest):
         )
 
 
+@router.get(
+    "/history/{session_id}",
+    response_model=ResultContext[list[dict]],
+    summary="获取对话历史",
+    description="""
+    获取指定会话的对话历史记录。
+    
+    参数说明：
+    - session_id: 会话ID（必填）
+    
+    返回：
+    - 消息历史列表，格式：[{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]
+    
+    使用场景：
+    - 前端打开对话时，先调用此接口获取历史消息
+    - 刷新页面后恢复对话历史
+    """,
+)
+async def get_history(session_id: str) -> ResultContext[list[dict]]:
+    """
+    获取对话历史
+    """
+    try:
+        logger.info(
+            "收到获取历史请求",
+            extra={"session_id": session_id}
+        )
+        
+        # 获取对话服务
+        chat_service = get_ai_chat_service()
+        
+        # 获取历史
+        messages = await chat_service.get_history(session_id=session_id)
+        
+        return ResultContext.ok(
+            data=messages,
+            message="获取对话历史成功"
+        )
+            
+    except Exception as e:
+        logger.error(f"获取历史失败: {e}", exc_info=True)
+        return ResultContext.fail(
+            message=f"获取历史失败: {str(e)}",
+            code="GET_HISTORY_ERROR"
+        )
+
+
 @router.post(
     "/clear-history",
     response_model=ResultContext[dict],
@@ -74,14 +121,10 @@ async def chat(request: AIAskRequest):
     清除对话历史记录。
     
     参数说明：
-    - user_id: 用户ID（可选）
-    - session_id: 会话ID（可选）
-        - 如果传递 session_id，则只清除该会话的历史
-        - 如果不传 session_id，则清除该用户的所有会话历史
+    - session_id: 会话ID（必填）
     
     使用场景：
     - 前端提供"清除对话"按钮，点击后调用此接口
-    - 用户切换会话时，可以清除旧会话
     """,
 )
 async def clear_history(request: AIClearHistoryRequest) -> ResultContext[dict]:
