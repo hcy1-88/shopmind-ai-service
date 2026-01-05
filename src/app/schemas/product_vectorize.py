@@ -35,10 +35,6 @@ class VectorizeProductRequest(CamelCaseModel):
         ...,
         description="商品标签列表",
     )
-    price: Decimal = Field(
-        ...,
-        description="商品的价格，（取现价，或者 价格范围的最低价格，或者原价）"
-    )
 
 
 

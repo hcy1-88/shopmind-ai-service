@@ -27,10 +27,6 @@ class ProductVectorizeService:
         try:
             logger.info(f"开始向量化商品，product_id: {request.product_id}")
 
-            # 先删已存在的数据
-            collection = get_product_collection()
-            collection.delete(f"product_id == {request.product_id}")
-
             # 1. 构建完整文本：标题 + 描述 + 摘要 + 标签
             text_parts = [
                 f"商品标题：{request.title}",
@@ -60,13 +56,12 @@ class ProductVectorizeService:
             # 3. 准备插入数据
             entities = [{
                 "product_id": request.product_id,
-                "price": float(request.price),
                 "embedding": embedding_vector,
             }]
 
             # 4. 插入到 Milvus
-
-            insert_result = collection.insert(entities)
+            collection = get_product_collection()
+            insert_result = collection.upsert(entities)
 
             # 5. 刷新 collection 以确保数据持久化
             collection.flush()

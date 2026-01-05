@@ -34,29 +34,15 @@ def create_product_collection_schema() -> CollectionSchema:
 
     # 定义字段
     fields = [
-        # 主键字段：自动生成的唯一 ID（使用雪花算法）
-        FieldSchema(
-            name="id",
-            dtype=DataType.VARCHAR,
-            max_length=64,
-            is_primary=True,
-            auto_id=True,  # 自动生成 ID
-            description="主键 ID，自动生成"
-        ),
-        
         # 商品 ID：业务主键
         FieldSchema(
             name="product_id",
             dtype=DataType.INT64,
+            is_primary=True,
+            auto_id=False,
             description="商品 ID（业务主键）"
         ),
-        
-        # 价格字段：使用 DOUBLE 类型存储价格
-        FieldSchema(
-            name="price",
-            dtype=DataType.DOUBLE,
-            description="商品价格"
-        ),
+
         
         # 密集向量字段：存储商品的嵌入向量
         FieldSchema(
