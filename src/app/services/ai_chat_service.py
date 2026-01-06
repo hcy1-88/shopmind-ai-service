@@ -2,13 +2,14 @@
 
 from typing import AsyncGenerator, Optional
 from langchain_core.messages import HumanMessage, AIMessage
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langgraph.graph import START, MessagesState, StateGraph
+from app.services.rag_service import get_rag_service
+from langchain.agents import create_agent
 
 from app.config.nacos_client import get_nacos_client
 from app.schemas.ai_ask_schema import AIAskRequest
 from app.services import llm_service
 from app.checkpoints import get_redis_checkpoint_saver
+from app.tools.chat_tool import platform_knowledge_search
 from app.utils.logger import app_logger as logger
 
 
@@ -33,11 +34,11 @@ class AIChatService:
         ttl = chat_config.get("checkpoint_expire", 2)
         self.checkpointer = get_redis_checkpoint_saver(ttl=ttl*3600)
         
-        # 创建对话提示词模板
-        self.prompt = ChatPromptTemplate.from_messages([
-            ("system", "你是一个友好且专业的 AI 购物助手。你可以帮助用户推荐商品、回答问题、提供购物建议。"),
-            MessagesPlaceholder(variable_name="messages"),
-        ])
+        # 系统提示词
+        self.system_prompt = (
+            "你是一个友好且专业的 AI 购物助手。你可以帮助用户推荐商品、回答问题、提供购物建议。"
+            "当用户询问平台规则、政策、流程等问题时，使用 platform_knowledge_search 工具搜索知识库获取准确信息。"
+        )
         
         # 创建对话图（单例，所有请求复用）
         self.graph = self._build_graph()
@@ -57,28 +58,25 @@ class AIChatService:
         构建对话图（仅在初始化时调用一次）
         
         Returns:
-            编译后的 LangGraph 图实例
+            编译后的 LangGraph 图实例（带 RAG 工具的 Agent）
         """
         # 获取 LLM
         llm = llm_service.get_llm_service().get_chat_model()
         
-        # 定义调用模型的函数
-        def call_model(state: MessagesState):
-            """调用模型生成回复"""
-            # 使用提示词模板
-            chain = self.prompt | llm
-            response = chain.invoke(state)
-            return {"messages": response}
+        # 获取 RAG 查询工具
+        tools = [platform_knowledge_search]
+        logger.info("RAG工具已集成")
         
-        # 构建图
-        workflow = StateGraph(state_schema=MessagesState)
-        workflow.add_edge(START, "model")
-        workflow.add_node("model", call_model)
+        # 使用 create_react_agent 创建带工具的 Agent
+        # state_modifier 可以是字符串（系统提示词）或函数
+        graph = create_agent(
+            llm,
+            tools=tools,
+            checkpointer=self.checkpointer,
+            system_prompt=self.system_prompt  # 使用定义的系统提示词
+        )
         
-        # 编译图，添加 checkpointer 短期记忆
-        graph = workflow.compile(checkpointer=self.checkpointer)
-        
-        logger.info("LangGraph 对话图构建完成（单例模式，所有请求将复用此实例）")
+        logger.info(f"LangGraph 对话图构建完成（单例模式，集成了 {len(tools)} 个工具）")
         return graph
     
     async def chat_stream(self, request: AIAskRequest) -> AsyncGenerator[str, None]:
@@ -178,3 +176,6 @@ class AIChatService:
 def get_ai_chat_service() -> AIChatService:
     """获取 AI 对话服务单例"""
     return AIChatService.get_instance()
+
+def init_ai_chat_service() -> None:
+    get_ai_chat_service()

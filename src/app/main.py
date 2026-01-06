@@ -5,16 +5,18 @@ import sys
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.middleware.cors import CORSMiddleware
+# from fastapi.middleware.cors import CORSMiddleware  # CORS 由 Gateway 处理
 from fastapi.responses import JSONResponse
 from app.clients.redis_client import get_redis_client
 from app.config import get_settings
 from app.config.nacos_client import get_nacos_client, init_nacos
 from app.middleware.trace_middleware import TraceIDMiddleware
-from app.routers import ai_ask_router, ai_product_router
+from app.routers import ai_ask_router, ai_product_router, rag_router
 from app.schemas.result_context import ResultContext
+from app.services.ai_chat_service import init_ai_chat_service
 from app.services.embedding_service import init_embedding_service
 from app.services.llm_service import init_llm_service
+from app.services.rag_service import init_rag_service
 from app.utils.logger import app_logger as logger
 from app.utils.logger import setup_logger
 from app.vector_store import init_milvus
@@ -57,6 +59,13 @@ async def lifespan(app: FastAPI):
 
         logger.info("Shopmind AI service 启动成功！")
 
+        # 初始化对话
+        init_ai_chat_service()
+        logger.info("AI 对话初始化成功！")
+
+        # 初始化 RAG 服务
+        init_rag_service()
+        
         # ===== 新增：打印服务启动 Banner =====
         service_name = "ShopMind AI Service"
         host = settings.service_ip
@@ -113,18 +122,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add TraceID middleware (必须在 CORS 之前，以便尽早设置 traceId)
+# Add TraceID middleware
 app.add_middleware(TraceIDMiddleware)
-
-# Add CORS middleware 跨域
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 
 # Exception handlers
 @app.exception_handler(RequestValidationError)
@@ -172,7 +171,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 # Include routers
 app.include_router(ai_product_router.router)
 app.include_router(ai_ask_router.router)
-
+app.include_router(rag_router.router)
 
 # Root endpoint
 @app.get("/", tags=["Root"], response_model=ResultContext[dict])

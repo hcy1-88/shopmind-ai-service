@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShopMind RAG 知识库管理</title>
+    
+    <!-- Element Plus CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/element-plus@2.4.4/dist/index.css">
+    
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        #app {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 36px;
+            margin: 0 0 10px 0;
+            font-weight: 600;
+        }
+        
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+            margin: 0;
+        }
+        
+        .main-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+        
+        .upload-section {
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .document-list {
+            padding: 20px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card h3 {
+            margin: 0 0 5px 0;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .stat-card .number {
+            font-size: 32px;
+            font-weight: bold;
+            margin: 0;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        
+        .empty-state i {
+            font-size: 64px;
+            color: #ddd;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="header">
+            <h1>📚 ShopMind RAG 知识库</h1>
+            <p>平台规则文档管理系统</p>
+        </div>
+        
+        <div class="main-card">
+            <!-- 上传区域 -->
+            <div class="upload-section">
+                <el-row :gutter="20">
+                    <el-col :span="16">
+                        <el-upload
+                            ref="uploadRef"
+                            :action="uploadUrl"
+                            :data="uploadData"
+                            :on-success="handleUploadSuccess"
+                            :on-error="handleUploadError"
+                            :before-upload="beforeUpload"
+                            :show-file-list="false"
+                            drag
+                            accept=".txt,.pdf,.docx,.doc,.md"
+                        >
+                            <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+                            <div class="el-upload__text">
+                                拖拽文件到此处或 <em>点击上传</em>
+                            </div>
+                            <template #tip>
+                                <div class="el-upload__tip">
+                                    支持 txt、pdf、docx、md 格式，文件大小不超过 10MB
+                                </div>
+                            </template>
+                        </el-upload>
+                    </el-col>
+                    <el-col :span="8">
+                        <div class="stat-card">
+                            <h3>文档总数</h3>
+                            <p class="number">{{ documents.length }}</p>
+                        </div>
+                    </el-col>
+                </el-row>
+            </div>
+            
+            <!-- 文档列表 -->
+            <div class="document-list">
+                <el-row style="margin-bottom: 20px;">
+                    <el-col :span="12">
+                        <h2 style="margin: 0;">文档列表</h2>
+                    </el-col>
+                    <el-col :span="12" style="text-align: right;">
+                        <el-button 
+                            type="primary" 
+                            :icon="Refresh" 
+                            @click="loadDocuments"
+                            :loading="loading"
+                        >
+                            刷新
+                        </el-button>
+                    </el-col>
+                </el-row>
+                
+                <!-- 文档表格 -->
+                <el-table 
+                    v-if="documents.length > 0"
+                    :data="documents" 
+                    style="width: 100%"
+                    v-loading="loading"
+                >
+                    <el-table-column prop="filename" label="文件名" min-width="200">
+                        <template #default="scope">
+                            <el-icon style="margin-right: 5px;"><document /></el-icon>
+                            {{ scope.row.filename }}
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="category" label="分类" width="120">
+                        <template #default="scope">
+                            <el-tag type="primary">{{ scope.row.category }}</el-tag>
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="text_preview" label="内容预览" min-width="300" show-overflow-tooltip />
+                    <el-table-column label="操作" width="100" fixed="right">
+                        <template #default="scope">
+                            <el-button 
+                                type="danger" 
+                                size="small" 
+                                :icon="Delete"
+                                @click="deleteDocument(scope.row)"
+                                link
+                            >
+                                删除
+                            </el-button>
+                        </template>
+                    </el-table-column>
+                </el-table>
+                
+                <!-- 空状态 -->
+                <div v-else class="empty-state">
+                    <el-icon><folder-opened /></el-icon>
+                    <p>暂无文档</p>
+                    <p style="font-size: 14px;">请上传文档到知识库</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3.3.11/dist/vue.global.js"></script>
+    <!-- Element Plus -->
+    <script src="https://unpkg.com/element-plus@2.4.4/dist/index.full.js"></script>
+    <!-- Element Plus Icons -->
+    <script src="https://unpkg.com/@element-plus/icons-vue@2.1.0/dist/index.iife.min.js"></script>
+
+    <script>
+        const { createApp, ref, onMounted } = Vue;
+        const { ElMessage, ElMessageBox } = ElementPlus;
+
+        // API 基础地址
+        const API_BASE = 'http://localhost:8080/api/shopmind-ai-service';
+
+        createApp({
+            setup() {
+                // 注册图标
+                const { 
+                    UploadFilled, 
+                    Document, 
+                    Delete, 
+                    Refresh,
+                    FolderOpened 
+                } = ElementPlusIconsVue;
+
+                // 响应式数据
+                const documents = ref([]);
+                const loading = ref(false);
+                const uploadRef = ref(null);
+                
+                const uploadUrl = `${API_BASE}/rag/upload`;
+                const uploadData = ref({
+                    category: 'platform_rule'
+                });
+
+                // 加载文档列表
+                const loadDocuments = async () => {
+                    loading.value = true;
+                    try {
+                        const response = await fetch(`${API_BASE}/rag/documents`);
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            documents.value = result.data || [];
+                            ElMessage.success('文档列表加载成功');
+                        } else {
+                            ElMessage.error(result.message || '加载失败');
+                        }
+                    } catch (error) {
+                        console.error('加载文档失败:', error);
+                        ElMessage.error('加载文档失败: ' + error.message);
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
+                // 上传前验证
+                const beforeUpload = (file) => {
+                    const isLt10M = file.size / 1024 / 1024 < 10;
+                    if (!isLt10M) {
+                        ElMessage.error('文件大小不能超过 10MB');
+                        return false;
+                    }
+                    return true;
+                };
+
+                // 上传成功
+                const handleUploadSuccess = (response) => {
+                    if (response.success) {
+                        ElMessage.success('文档上传成功');
+                        loadDocuments(); // 刷新列表
+                    } else {
+                        ElMessage.error(response.message || '上传失败');
+                    }
+                };
+
+                // 上传失败
+                const handleUploadError = (error) => {
+                    console.error('上传失败:', error);
+                    ElMessage.error('上传失败，请重试');
+                };
+
+                // 删除文档
+                const deleteDocument = async (doc) => {
+                    try {
+                        await ElMessageBox.confirm(
+                            `确定要删除文档 "${doc.filename}" 吗？这将删除该文件的所有内容块。`,
+                            '确认删除',
+                            {
+                                confirmButtonText: '删除',
+                                cancelButtonText: '取消',
+                                type: 'warning',
+                            }
+                        );
+
+                        loading.value = true;
+                        const response = await fetch(
+                            `${API_BASE}/rag/documents/${encodeURIComponent(doc.filename)}`,
+                            { method: 'DELETE' }
+                        );
+                        const result = await response.json();
+
+                        if (result.success) {
+                            ElMessage.success('文档删除成功');
+                            loadDocuments(); // 刷新列表
+                        } else {
+                            ElMessage.error(result.message || '删除失败');
+                        }
+                    } catch (error) {
+                        if (error !== 'cancel') {
+                            console.error('删除失败:', error);
+                            ElMessage.error('删除失败: ' + error.message);
+                        }
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
+                // 组件挂载时加载数据
+                onMounted(() => {
+                    loadDocuments();
+                });
+
+                return {
+                    documents,
+                    loading,
+                    uploadRef,
+                    uploadUrl,
+                    uploadData,
+                    loadDocuments,
+                    beforeUpload,
+                    handleUploadSuccess,
+                    handleUploadError,
+                    deleteDocument,
+                    // 图标
+                    UploadFilled,
+                    Document,
+                    Delete,
+                    Refresh,
+                    FolderOpened
+                };
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>
+

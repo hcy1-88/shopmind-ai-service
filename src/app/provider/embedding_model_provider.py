@@ -10,7 +10,7 @@ from typing import Any
 
 import dashscope
 from dashscope import MultiModalEmbeddingItemImage
-from langchain_community.embeddings import DashScopeEmbeddings
+from llama_index.embeddings.dashscope import DashScopeEmbedding, DashScopeTextEmbeddingType
 
 
 class EmbeddingProvider(ABC):
@@ -54,26 +54,31 @@ class DashEmbeddingProvider(EmbeddingProvider):
         self.vision_model = bailian_config["vision_model"]
         self.vision_model_dim = bailian_config["vision_model_dim"]
         self.api_key = bailian_config["api_key"]
-        self.text_embeddings = DashScopeEmbeddings(model=self.text_model, dashscope_api_key=self.api_key)
+        # 使用 LlamaIndex 的 DashScopeEmbedding
+        self.text_embeddings = DashScopeEmbedding(
+            model_name=self.text_model,
+            api_key=self.api_key,
+            text_type=DashScopeTextEmbeddingType.TEXT_TYPE_DOCUMENT
+        )
 
     async def embed_query(self, query: str) -> list[float]:
         """适用于对查询进行嵌入"""
         if not query:
             return []
-        return await self.text_embeddings.aembed_query(text=query)
+        return await self.text_embeddings.aget_query_embedding(query)
 
     async def embed_document(self, text: str) -> list[float]:
         """对单一文档进行嵌入，适合存放到向量数据库中被检索"""
         if not text:
             return []
-        response =  await self.text_embeddings.aembed_documents([text])
-        return response[0]
+        return await self.text_embeddings.aget_text_embedding(text)
 
     async def embed_documents(self, texts: list[str]) -> list[list[float]]:
         """批量文档的嵌入，适合存放到向量数据库中被检索"""
         if not texts:
             return []
-        return await self.text_embeddings.aembed_documents(texts)
+        # LlamaIndex 的批量嵌入
+        return await self.text_embeddings.aget_text_embedding_batch(texts)
 
     async def embed_image(self, image: str) -> list[float]:
         """一张图片的嵌入"""

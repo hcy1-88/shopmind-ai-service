@@ -52,6 +52,11 @@ class EmbeddingService:
         if self._provider is None:
             raise RuntimeError("Embedding provider 未初始化")
         return self._provider
+    
+    @property
+    def text_model(self) -> str:
+        """Get text model."""
+        return self.provider.text_model
 
     @property
     def text_model_dim(self) -> int:

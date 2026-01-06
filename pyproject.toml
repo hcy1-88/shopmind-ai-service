@@ -24,6 +24,10 @@ dependencies = [
    "nacos-sdk-python",
    "dashscope>=1.25.5",
    "redis>=7.1.0",
+   "llama-index-storage-docstore-postgres>=0.4.1",
+   "llama-index-storage-index-store-postgres>=0.5.1",
+   "python-multipart>=0.0.21",
+   "llama-index-embeddings-dashscope>=0.4.1",
 ]
 
 [build-system]

@@ -231,6 +231,15 @@ class NacosClient:
             return nacos_config[NAME]
         raise ValueError("redis 配置项缺失，服务启动失败！")
 
+    
+    def get_rag_config(self) -> dict[str, Any]:
+        """获取 rag 配置"""
+        nacos_config = self.config_from_nacos
+        NAME = "rag"
+        if NAME in nacos_config:
+            return nacos_config[NAME]
+        raise ValueError("rag 配置项缺失，服务启动失败！")
+
 
 def get_nacos_client(settings: Optional[Settings] = None) -> NacosClient:
     """
