@@ -319,19 +319,13 @@ class RAGService:
             logger.info(f"准备删除文件 {filename}: ref_doc_id={ref_doc_id}, {len(node_ids_to_delete)} 个节点")
             
             # 1. 从 VectorStore 和 IndexStore 删除（使用 ref_doc_id）
-            try:
-                index.delete_ref_doc(ref_doc_id, delete_from_docstore=False)
-                logger.info(f"已从 VectorStore 和 IndexStore 删除 ref_doc_id: {ref_doc_id}")
-            except Exception as e:
-                logger.warning(f"从 VectorStore/IndexStore 删除失败: {e}")
+            # 注意：由于 Milvus 的 stores_text=True，delete_from_docstore=True 不会生效
+            # 因此下面需要手动删除 DocStore
+            index.delete_ref_doc(ref_doc_id, delete_from_docstore=False)
+            logger.info(f"已从 VectorStore 和 IndexStore 删除 ref_doc_id: {ref_doc_id}")
             
-            # 2. 手动从 DocStore 删除所有节点
-            for node_id in node_ids_to_delete:
-                try:
-                    docstore.delete_document(node_id, raise_error=False)
-                    logger.info(f"已从 DocStore 删除 node_id: {node_id}")
-                except Exception as e:
-                    logger.warning(f"从 DocStore 删除 {node_id} 失败: {e}")
+            # 2. 手动从 DocStore 删除所有节点（必须手动删除，因为 Milvus stores_text=True 导致自动删除失效）
+            docstore.delete_ref_doc(ref_doc_id)
             
             logger.info(f"文档删除成功: {filename}, 删除了 ref_doc_id={ref_doc_id}, {len(node_ids_to_delete)} 个节点")
             return True
