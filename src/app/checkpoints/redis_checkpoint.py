@@ -6,6 +6,8 @@ import pickle
 import redis
 import redis.asyncio as aioredis
 from typing import Optional, Any, Iterator
+
+from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver, Checkpoint, CheckpointTuple, CheckpointMetadata
 
@@ -105,7 +107,6 @@ class RedisCheckpointSaver(BaseCheckpointSaver):
         data = {
             "checkpoint": checkpoint,
             "metadata": metadata,
-            "parent_config": config.get("parent_config"),
         }
         
         try:
@@ -280,6 +281,7 @@ class RedisCheckpointSaver(BaseCheckpointSaver):
         config: RunnableConfig,
         writes: list[tuple[str, Any]],
         task_id: str,
+        task_path: str = ""
     ) -> None:
         """异步写入 writes（LangGraph 需要）"""
         # 简化实现：不单独存储 writes，直接通过 checkpoint 管理
@@ -324,12 +326,10 @@ class RedisCheckpointSaver(BaseCheckpointSaver):
             消息列表
         """
         try:
-            config = {
-                "configurable": {
+            config = RunnableConfig(configurable={
                     "thread_id": thread_id,
                     "checkpoint_ns": "",
-                }
-            }
+                })
             
             tuple_result = self.get_tuple(config)
             if not tuple_result:
@@ -343,6 +343,8 @@ class RedisCheckpointSaver(BaseCheckpointSaver):
             # 转换为前端需要的格式
             result = []
             for msg in messages:
+                if not msg.content and isinstance(msg, AIMessage) or isinstance(msg, ToolMessage):
+                    continue
                 if hasattr(msg, "type") and hasattr(msg, "content"):
                     result.append({
                         "role": "user" if msg.type == "human" else "assistant",

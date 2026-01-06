@@ -7,6 +7,8 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 # from fastapi.middleware.cors import CORSMiddleware  # CORS 由 Gateway 处理
 from fastapi.responses import JSONResponse
+
+from app.clients.product_service import init_product_service_client
 from app.clients.redis_client import get_redis_client
 from app.config import get_settings
 from app.config.nacos_client import get_nacos_client, init_nacos
@@ -65,6 +67,9 @@ async def lifespan(app: FastAPI):
 
         # 初始化 RAG 服务
         init_rag_service()
+
+        # 初始化商品服务客户端
+        await init_product_service_client()
         
         # ===== 新增：打印服务启动 Banner =====
         service_name = "ShopMind AI Service"
