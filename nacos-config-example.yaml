@@ -1,32 +1,27 @@
 # Nacos 配置示例
-# Data ID: ai-service.yaml
+# Data ID: shopmind-ai-service.yaml
 # Group: DEFAULT_GROUP
 # 配置格式: YAML
-
-# PostgreSQL 数据库配置
-postgresql:
-  host: localhost
-  port: 5432
-  user: postgres
-  password: your-postgres-password
-  database: shopmind
-  pool_size: 10
-  max_overflow: 20
 
 # Milvus 向量数据库配置
 milvus:
   host: localhost
   port: 19530
-  user: null  # 如果没有设置用户名密码，设为 null
-  password: null
-  db_name: default
+  token: root:Milvus
+  # 不存在，则创建
+  db_name: shopmind_dev
 
-# RocketMQ 消息队列配置
-rocketmq:
-  namesrv_addr: 127.0.0.1:9876
-  access_key: null  # 如果没有开启认证，设为 null
-  secret_key: null
-  group_id: ai-service-group
+
+embedding:
+  # 使用 阿里云百炼平台 的嵌入模型，用官方的 dashscope
+  provider: bailian
+  bailian:
+    text_model: text-embedding-v4
+    text_model_dim: 1024
+    vision_model: tongyi-embedding-vision-plus
+    vision_model_dim: 1152
+    api_key: sk-af3f441d4a1343bfabe5a6395ecacc91
+
 
 # LLM 大语言模型配置
 llm:
@@ -35,18 +30,75 @@ llm:
 
   # OpenAI 配置
   openai:
-    api_key: sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-    api_base: null  # 可选，使用代理或自定义端点时设置
+    api_key: sk-UWy0ENwJ3j5LCTgn47LZjv6wTv9TQ51vppqxWjTDHXS3lQSq
+    api_base: https://api.openai-proxy.org/v1
     model: gpt-4o-mini  # 文本生成模型
     vision_model: gpt-4o  # 视觉理解模型
 
   # 通义千问配置 (预留，暂未完全实现)
   tongyi:
-    api_key: your-tongyi-api-key
-    model: qwen-max
-    vision_model: qwen-vl-max
+    api_key: sk-af3f441d4a1343bfabe5a6395ecacc91
+    api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+    model: qwen-plus
+    vision_model: qwen3-vl-plus
 
   # 通用 LLM 参数
   temperature: 0.7  # 温度参数，控制随机性 (0-1)
   max_tokens: 2000  # 最大生成 token 数
   timeout: 60  # 请求超时时间（秒）
+
+
+redis:
+  url: "redis://localhost:6379/2"
+  max_connections: 10
+  password: root
+
+
+chat:
+  # 短期记忆过期时间，默认 2 小时
+  checkpoint_expire: 2
+
+
+# RAG 存储配置 - PostgreSQL DocStore & IndexStore
+rag:
+  storage:
+    postgres:
+      # 文档存储 (DocStore)
+      docstore:
+        host: localhost
+        port: 15432
+        database: shopmind_rag
+        user: postgres
+        password: hcy991002
+        table_name: platform_rule_docs
+        schema_name: public
+        perform_setup: true   # 首次启动时自动建表
+        debug: false
+        use_jsonb: true       # 强烈建议开启：使用 JSONB 类型提升查询性能
+
+      # 索引元数据存储 (IndexStore) - 虽 VectorStoreIndex 不强制需要，但保留以备扩展
+      indexstore:
+        host: localhost
+        port: 15432
+        database: shopmind_rag
+        user: postgres
+        password: hcy991002
+        table_name: platform_rule_indices
+        schema_name: public
+        perform_setup: true
+        debug: false
+        use_jsonb: true
+
+    # 向量存储 (Milvus) - 注意，维度由 embedding service 配置项进行提供，不可自定义
+    milvus:
+      host: localhost
+      port: 19530
+      token: root:Milvus
+      # 不存在，则创建
+      db_name: platform_rules
+      collection_name: platform_rules_collection
+      similarity_metric: COSINE
+      index_type: HNSW
+      HNSW:
+        params_M: 8
+        params_efConstruction: 100
