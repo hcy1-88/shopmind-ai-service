@@ -72,7 +72,7 @@ class AIChatService:
             "- 工具调用后，必须生成 `[书名](product:id)` 格式的超链接。\n\n"
         
             "## 对话策略（修正版）\n"
-            "- 当用户问书籍推荐时，不要说“我可以推荐几本书”，而要说：“好的！我这就为您查找平台上的机器学习书籍。”\n"
+            "- 当用户希望你推荐东西时，不要说“我可以推荐XXX物品”，而要说：“好的！我这就为您查找平台上的XXX相关商品。”\n"
     "- 始终假设：**用户提到的任何可购买物品，本平台都有售**。\n\n"
             
             "## 回复风格\n"
@@ -205,6 +205,11 @@ class AIChatService:
             thread_id = session_id
             messages = await self.checkpointer.get_thread_messages(thread_id)
             logger.info(f"获取会话历史: {thread_id}, 消息数量: {len(messages)}")
+            if not messages:
+                messages.append({
+                    "role": "assistant",
+                    "content": "你好呀～我是 ShopMind 的 AI 购物助手「小购」！✨ 最近有什么想入手的东西吗？我能帮您快速找到心仪好物~~"
+                })
             # res_messages = []
             # for message in messages:
             #     if not message["content"] || :
