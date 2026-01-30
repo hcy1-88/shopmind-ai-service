@@ -32,7 +32,7 @@ class SearchKeywordEnhanceChain(VisionAwareAIGenerator[SearchKeyWordEnhanceReque
            - 必须是名词，且代表商品本身。
            - 也可以是品牌名称（如果有的话），如 华为、苹果、iPhone、爱马仕、戴尔
            - 如果用户未明确品类（如“送女友的礼物”），则留空，去做扩展词处理。
-           - 通常只有 1 个，但最多不超过 2 个。
+           - 通常只有 1 个，但最多不超过 2 个。核心词是必然在原文包含的。
            - 如果用户只输入了形容词，没有实体物品，这是非常极端的情况，那么你把形容词识别出来作为名词，比如 "可爱"、"舒服"  
         
         2. 【扩展词】：包括以下任意类型：
@@ -51,7 +51,7 @@ class SearchKeywordEnhanceChain(VisionAwareAIGenerator[SearchKeyWordEnhanceReque
         示例：
         输入：冬季穿的保暖加绒裤子  
         输出：  
-        core_words: [裤子]  
+        core_words: [裤]  # 裤是常用词
         expand_words: [冬季, 保暖, 加绒, 厚实, 防寒]
         
         （说明：因为搜索词是学习相关的，因此可能是 书籍、教程、视频教学 等词汇。）
