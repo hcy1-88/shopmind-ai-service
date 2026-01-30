@@ -30,7 +30,6 @@ class ProductVectorizeService:
             # 1. 构建完整文本：标题 + 描述 + 摘要 + 标签
             text_parts = [
                 f"商品标题：{request.title}",
-                f"商品描述：{request.description}",
                 f"AI 摘要：{request.ai_summary}",
             ]
 

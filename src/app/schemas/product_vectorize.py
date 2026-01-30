@@ -23,16 +23,16 @@ class VectorizeProductRequest(CamelCaseModel):
         ...,
         description="商品标题",
     )
-    description: str = Field(
-        ...,
+    description: Optional[str] = Field(
+        None,
         description="商品描述",
     )
     ai_summary: str = Field(
         ...,
         description="AI 摘要",
     )
-    tags: List[str] = Field(
-        ...,
+    tags: Optional[List[str]] = Field(
+        None,
         description="商品标签列表",
     )
 
