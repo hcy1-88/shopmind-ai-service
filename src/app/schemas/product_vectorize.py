@@ -57,3 +57,33 @@ class VectorizeProductResponse(CamelCaseModel):
         default=None,
         description="错误信息（如果失败）",
     )
+
+
+class DeleteVectorRequest(CamelCaseModel):
+    """删除商品向量请求模型."""
+
+    product_id: int = Field(
+        ...,
+        description="商品 ID",
+    )
+
+
+class DeleteVectorResponse(CamelCaseModel):
+    """删除商品向量响应模型."""
+
+    product_id: int = Field(
+        ...,
+        description="商品 ID",
+    )
+    success: bool = Field(
+        ...,
+        description="删除是否成功",
+    )
+    deleted_count: int = Field(
+        ...,
+        description="删除的记录数",
+    )
+    error_message: Optional[str] = Field(
+        default=None,
+        description="错误信息（如果失败）",
+    )

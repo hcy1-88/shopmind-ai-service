@@ -16,6 +16,8 @@ from app.schemas.product_summary import SummaryGenerateRequest, SummaryGenerateR
 from app.schemas.product_tag import GenerateTagsRequest, GenerateTagsResponse
 from app.schemas.product_title_check import TitleCheckRequest, TitleCheckResponse
 from app.schemas.search_schema import SearchKeyWordEnhanceRequest, SearchKeywordEnhanceResponse
+from app.schemas.product_vectorize import DeleteVectorRequest, DeleteVectorResponse
+from app.vector_store.product_collection import get_product_collection
 from app.utils.logger import app_logger as logger
 
 
@@ -174,3 +176,50 @@ class ProductAIService:
         res = await SearchKeywordEnhanceChain.get_instance().generate(request)
         logger.info(f"用户搜索词: {request.keyword}， 增强后：{res.core_words} and {res.expand_words}")
         return res
+
+    @staticmethod
+    async def delete_product_vector(request: DeleteVectorRequest) -> DeleteVectorResponse:
+        """
+        删除商品向量
+
+        Args:
+            request: 包含商品 ID 的请求
+
+        Returns:
+            删除结果
+        """
+        try:
+            logger.info(f"开始删除商品向量，product_id: {request.product_id}")
+
+            collection = get_product_collection()
+
+            # 根据 product_id 删除记录
+            delete_result = collection.delete(f"product_id == {request.product_id}")
+
+            # 刷新 collection 以确保数据持久化
+            collection.flush()
+
+            deleted_count = delete_result.delete_count
+
+            logger.info(f"商品 {request.product_id} 向量删除成功，删除记录数: {deleted_count}")
+
+            return DeleteVectorResponse(
+                product_id=request.product_id,
+                success=True,
+                deleted_count=deleted_count,
+                error_message=None,
+            )
+
+        except Exception as e:
+            error_msg = f"删除商品向量失败: {str(e)}"
+            logger.error(
+                f"商品 {request.product_id} 向量删除失败: {e}",
+                exc_info=True
+            )
+
+            return DeleteVectorResponse(
+                product_id=request.product_id,
+                success=False,
+                deleted_count=0,
+                error_message=error_msg,
+            )

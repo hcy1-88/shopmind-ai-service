@@ -12,7 +12,7 @@ from app.schemas.product_tag import GenerateTagsResponse, GenerateTagsRequest
 from app.schemas.result_context import ResultContext
 from app.schemas.product_summary import SummaryGenerateRequest, SummaryGenerateResponse
 from app.schemas.product_title_check import TitleCheckRequest, TitleCheckResponse
-from app.schemas.product_vectorize import VectorizeProductRequest, VectorizeProductResponse
+from app.schemas.product_vectorize import VectorizeProductRequest, VectorizeProductResponse, DeleteVectorRequest, DeleteVectorResponse
 from app.schemas.search_schema import SearchKeyWordEnhanceRequest, SearchKeywordEnhanceResponse
 from app.services.product_ai_service import ProductAIService
 from app.services.product_vectorize_service import ProductVectorizeService
@@ -249,3 +249,28 @@ async def enhance_search_keyword(request: SearchKeyWordEnhanceRequest) -> Result
     """
     response = await ProductAIService.enhance_keyword(request)
     return ResultContext.ok(data=response, message="搜索词增强成功")
+
+
+@router.post(
+    "/vectorize/delete",
+    response_model=ResultContext[DeleteVectorResponse],
+    summary="删除商品向量",
+    description="根据商品 ID 删除 Milvus 中的商品向量数据"
+)
+async def delete_product_vector(request: DeleteVectorRequest) -> ResultContext[DeleteVectorResponse]:
+    """
+    删除商品向量
+
+    根据 product_id 删除 Milvus 中 product_collection 的对应记录。
+    """
+    logger.info(f"请求删除商品向量，product_id: {request.product_id}")
+    response = await ProductAIService.delete_product_vector(request)
+
+    if response.success:
+        return ResultContext.ok(data=response, message=f"商品向量删除成功，删除 {response.deleted_count} 条记录")
+    else:
+        return ResultContext.fail(
+            data=response,
+            message=f"商品向量删除失败: {response.error_message}",
+            code="DELETE_VECTOR_ERROR"
+        )
