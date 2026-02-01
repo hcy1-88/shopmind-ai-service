@@ -254,20 +254,23 @@ async def enhance_search_keyword(request: SearchKeyWordEnhanceRequest) -> Result
 @router.post(
     "/vectorize/delete",
     response_model=ResultContext[DeleteVectorResponse],
-    summary="删除商品向量",
-    description="根据商品 ID 删除 Milvus 中的商品向量数据"
+    summary="批量删除商品向量",
+    description="根据商品 ID 列表批量删除 Milvus 中的商品向量数据"
 )
 async def delete_product_vector(request: DeleteVectorRequest) -> ResultContext[DeleteVectorResponse]:
     """
-    删除商品向量
+    批量删除商品向量
 
-    根据 product_id 删除 Milvus 中 product_collection 的对应记录。
+    根据 product_ids 删除 Milvus 中 product_collection 的对应记录。
     """
-    logger.info(f"请求删除商品向量，product_id: {request.product_id}")
+    logger.info(f"请求批量删除商品向量，product_ids: {request.product_ids}")
     response = await ProductAIService.delete_product_vector(request)
 
-    if response.success:
-        return ResultContext.ok(data=response, message=f"商品向量删除成功，删除 {response.deleted_count} 条记录")
+    if response.success_count > 0:
+        message = f"商品向量删除完成，成功 {response.success_count} 个，失败 {len(response.failed_ids)} 个"
+        if response.failed_ids:
+            message += f"，失败 ID: {response.failed_ids}"
+        return ResultContext.ok(data=response, message=message)
     else:
         return ResultContext.fail(
             data=response,

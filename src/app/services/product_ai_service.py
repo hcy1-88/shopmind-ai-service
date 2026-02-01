@@ -180,46 +180,69 @@ class ProductAIService:
     @staticmethod
     async def delete_product_vector(request: DeleteVectorRequest) -> DeleteVectorResponse:
         """
-        删除商品向量
+        批量删除商品向量
 
         Args:
-            request: 包含商品 ID 的请求
+            request: 包含商品 ID 列表的请求
 
         Returns:
-            删除结果
+            删除结果，包含成功数、成功的 ID 列表和失败的 ID 列表
         """
         try:
-            logger.info(f"开始删除商品向量，product_id: {request.product_id}")
+            logger.info(f"开始批量删除商品向量，product_ids: {request.product_ids}")
 
             collection = get_product_collection()
 
-            # 根据 product_id 删除记录
-            delete_result = collection.delete(f"product_id == {request.product_id}")
+            success_ids: list[int] = []
+            failed_ids: list[int] = []
 
-            # 刷新 collection 以确保数据持久化
-            collection.flush()
+            for product_id in request.product_ids:
+                try:
+                    # 根据 product_id 删除记录
+                    delete_result = collection.delete(f"product_id == {product_id}")
 
-            deleted_count = delete_result.delete_count
+                    # 刷新 collection 以确保数据持久化
+                    collection.flush()
 
-            logger.info(f"商品 {request.product_id} 向量删除成功，删除记录数: {deleted_count}")
+                    deleted_count = delete_result.delete_count
+
+                    if deleted_count > 0:
+                        success_ids.append(product_id)
+                        logger.info(f"商品 {product_id} 向量删除成功，删除记录数: {deleted_count}")
+                    else:
+                        failed_ids.append(product_id)
+                        logger.warning(f"商品 {product_id} 未找到对应的向量记录")
+
+                except Exception as e:
+                    failed_ids.append(product_id)
+                    logger.error(
+                        f"商品 {product_id} 向量删除失败: {e}",
+                        exc_info=True
+                    )
+
+            success_count = len(success_ids)
+
+            logger.info(
+                f"批量删除商品向量完成，成功: {success_count}，失败: {len(failed_ids)}"
+            )
 
             return DeleteVectorResponse(
-                product_id=request.product_id,
-                success=True,
-                deleted_count=deleted_count,
+                success_count=success_count,
+                success_ids=success_ids,
+                failed_ids=failed_ids,
                 error_message=None,
             )
 
         except Exception as e:
-            error_msg = f"删除商品向量失败: {str(e)}"
+            error_msg = f"批量删除商品向量失败: {str(e)}"
             logger.error(
-                f"商品 {request.product_id} 向量删除失败: {e}",
+                f"批量删除商品向量失败: {e}",
                 exc_info=True
             )
 
             return DeleteVectorResponse(
-                product_id=request.product_id,
-                success=False,
-                deleted_count=0,
+                success_count=0,
+                success_ids=[],
+                failed_ids=request.product_ids,
                 error_message=error_msg,
             )

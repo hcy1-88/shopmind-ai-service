@@ -5,8 +5,7 @@
 @Time       : 2025/12/28 3:53
 @Author     : hcy18
 """
-from decimal import Decimal
-from typing import List, Optional
+from typing import Optional
 from pydantic import Field
 
 from app.schemas.base import CamelCaseModel
@@ -31,7 +30,7 @@ class VectorizeProductRequest(CamelCaseModel):
         ...,
         description="AI 摘要",
     )
-    tags: Optional[List[str]] = Field(
+    tags: Optional[list[str]] = Field(
         None,
         description="商品标签列表",
     )
@@ -62,28 +61,28 @@ class VectorizeProductResponse(CamelCaseModel):
 class DeleteVectorRequest(CamelCaseModel):
     """删除商品向量请求模型."""
 
-    product_id: int = Field(
+    product_ids: list[int] = Field(
         ...,
-        description="商品 ID",
+        description="商品 ID 列表",
     )
 
 
 class DeleteVectorResponse(CamelCaseModel):
     """删除商品向量响应模型."""
 
-    product_id: int = Field(
+    success_count: int = Field(
         ...,
-        description="商品 ID",
+        description="删除成功的商品数量",
     )
-    success: bool = Field(
-        ...,
-        description="删除是否成功",
+    success_ids: list[int] = Field(
+        default_factory=list,
+        description="删除成功的商品 ID 列表",
     )
-    deleted_count: int = Field(
-        ...,
-        description="删除的记录数",
+    failed_ids: list[int] = Field(
+        default_factory=list,
+        description="删除失败的商品 ID 列表",
     )
     error_message: Optional[str] = Field(
         default=None,
-        description="错误信息（如果失败）",
+        description="整体错误信息（如果全部失败）",
     )
