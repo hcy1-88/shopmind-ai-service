@@ -92,3 +92,21 @@ async def search_product(query: str, page_number: int = 1, page_size: int = 3) -
     except Exception as e:
         logger.error(f"[商品查询] 搜索商品失败: {e}", exc_info=True)
         return []
+
+
+@tool
+async def get_product_detail(product_id: int) -> ProductResponseDto:
+    """
+    根据商品ID查询商品详情，用于获取商品的完整信息包括价格、描述、库存、款式等，如果返回为空，说明商品详情获取失败！
+    Args:
+        product_id: 商品ID
+    """
+    try:
+        logger.info(f"[商品查询] 获取商品详情，product_id={product_id}")
+        product_client = await get_product_service_client()
+        result = await product_client.get_product_by_id(product_id)
+        logger.info(f"[商品查询] 获取商品详情成功！product_name={result.name}")
+        return result
+    except Exception as e:
+        logger.error(f"[商品查询] 获取商品详情失败: {e}", exc_info=True)
+        return None

@@ -86,6 +86,49 @@ class ProductServiceClient:
             raise
 
 
+    async def get_product_by_id(self, product_id: int) -> ProductResponseDto:
+        """
+        根据商品ID查询商品详情
+
+        Args:
+            product_id: 商品ID
+
+        Returns:
+            商品详情
+        """
+        try:
+            base_url = await self._get_base_url()
+            url = f"{base_url}/products/detail/{product_id}"
+            logger.info(f"获取商品详情, url={url}, product_id={product_id}")
+
+            headers = self._get_headers()
+
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(
+                    url,
+                    headers=headers
+                )
+                response.raise_for_status()
+
+                product_result_context = ResultContext[ProductResponseDto](**response.json())
+
+                if product_result_context.success:
+                    product = product_result_context.data
+                    logger.info(f"获取商品详情成功！product_name={product.name}")
+                    return product
+                else:
+                    logger.error(f"获取商品详情失败！url: {url}, product_id={product_id}")
+                    raise httpx.HTTPError("商品服务异常！")
+        except httpx.TimeoutException:
+            logger.error(f"获取商品详情超时！")
+            raise
+        except Exception as e:
+            logger.error(
+                f"获取商品详情异常: error={str(e)}",
+                exc_info=True
+            )
+            raise
+
     async def search_products(self, query: str, page_number: int = 1, page_size: int = 10) -> list[ProductResponseDto]:
         """
         根据输入的查询，搜索商品

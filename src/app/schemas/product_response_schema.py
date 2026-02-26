@@ -16,6 +16,15 @@ class PriceRange(CamelCaseModel):
     max: Optional[Decimal] = Field(default=None, description="最高价格")
 
 
+class ProductSkuResponseDto(CamelCaseModel):
+    """商品 SKU 响应 DTO（规格组合）."""
+    id: Union[int, str] = Field(..., description="SKU ID")
+    attributes: Optional[dict[str, str]] = Field(default=None, description="规格属性，如 {\"颜色\": \"星光色\", \"存储\": \"512GB\"}")
+    price: Optional[Decimal] = Field(default=None, description="SKU 价格")
+    stock: Optional[int] = Field(default=None, description="库存")
+    image: Optional[str] = Field(default=None, description="SKU 图片 URL")
+
+
 class TagInfo(CamelCaseModel):
     """标签信息."""
     name: str = Field(..., description="标签名称")
@@ -82,6 +91,7 @@ class ProductResponseDto(CamelCaseModel):
     sales_count: Optional[int] = Field(default=None, description="销量")
     view_count: Optional[int] = Field(default=None, description="浏览量")
     like_count: Optional[int] = Field(default=None, description="点赞量")
+    skus: Optional[list[ProductSkuResponseDto]] = Field(default_factory=list, description="商品规格组合")
 
 
     @field_serializer('id')

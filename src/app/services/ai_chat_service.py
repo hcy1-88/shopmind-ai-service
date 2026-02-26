@@ -8,7 +8,7 @@ from app.config.nacos_client import get_nacos_client
 from app.schemas.ai_ask_schema import AIAskRequest
 from app.services import llm_service
 from app.checkpoints import get_redis_checkpoint_saver
-from app.tools.chat_tool import platform_knowledge_search, get_new_product, search_product
+from app.tools.chat_tool import platform_knowledge_search, get_new_product, search_product, get_product_detail
 from app.utils.logger import app_logger as logger
 
 
@@ -93,7 +93,7 @@ class AIChatService:
         llm = llm_service.get_llm_service().get_chat_model()
         
         # 工具
-        tools = [platform_knowledge_search, get_new_product, search_product]
+        tools = [platform_knowledge_search, get_new_product, search_product, get_product_detail]
         logger.info("Agent 工具已集成!")
 
         # Agent
