@@ -19,3 +19,16 @@ class AIClearHistoryRequest(CamelCaseModel):
 
 class AIResponse(CamelCaseModel):
     answer: str = Field(..., description="AI的回答")
+
+
+class UpdateConversationNameRequest(CamelCaseModel):
+    """更新对话名称请求"""
+    user_id: str = Field(..., description="用户ID")
+    session_id: str = Field(..., description="会话ID")
+    name: str = Field(..., description="新对话名称")
+
+
+class DeleteConversationRequest(CamelCaseModel):
+    """删除对话请求"""
+    user_id: str = Field(..., description="用户ID")
+    session_id: str = Field(..., description="会话ID")

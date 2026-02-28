@@ -192,18 +192,79 @@ class AIChatService:
             thread_id = session_id
             messages = await self.checkpointer.get_thread_messages(thread_id)
             logger.info(f"获取会话历史: {thread_id}, 消息数量: {len(messages)}")
-            if not messages:
-                messages.append({
-                    "role": "assistant",
-                    "content": "你好呀～我是 ShopMind 的 AI 购物助手「小购」！✨ 最近有什么想入手的东西吗？我能帮您快速找到心仪好物~~"
-                })
-            # res_messages = []
-            # for message in messages:
-            #     if not message["content"] || :
+            # 注意：开场白由前端显示，不再由后端自动添加
             return messages
         except Exception as e:
             logger.error(f"获取对话历史失败: {e}", exc_info=True)
             return []
+    
+    # ========== 对话列表管理方法 ==========
+    
+    async def get_conversation_list(self, user_id: str) -> list[dict]:
+        """
+        获取用户的所有对话列表
+        
+        Args:
+            user_id: 用户ID
+            
+        Returns:
+            对话列表
+        """
+        return await self.checkpointer.get_conversation_list(user_id)
+    
+    async def create_conversation(self, user_id: str, session_id: str, name: str) -> bool:
+        """
+        创建新对话
+        
+        Args:
+            user_id: 用户ID
+            session_id: 会话ID
+            name: 对话名称
+            
+        Returns:
+            是否创建成功
+        """
+        return await self.checkpointer.create_conversation(user_id, session_id, name)
+    
+    async def update_conversation_name(self, user_id: str, session_id: str, name: str) -> bool:
+        """
+        更新对话名称
+        
+        Args:
+            user_id: 用户ID
+            session_id: 会话ID
+            name: 新对话名称
+            
+        Returns:
+            是否更新成功
+        """
+        return await self.checkpointer.update_conversation_name(user_id, session_id, name)
+    
+    async def delete_conversation(self, user_id: str, session_id: str) -> bool:
+        """
+        删除对话
+        
+        Args:
+            user_id: 用户ID
+            session_id: 会话ID
+            
+        Returns:
+            是否删除成功
+        """
+        return await self.checkpointer.delete_conversation(user_id, session_id)
+    
+    async def get_conversation_name(self, user_id: str, session_id: str) -> Optional[str]:
+        """
+        获取指定对话的名称
+        
+        Args:
+            user_id: 用户ID
+            session_id: 会话ID
+            
+        Returns:
+            对话名称
+        """
+        return await self.checkpointer.get_conversation_name(user_id, session_id)
     
 
 

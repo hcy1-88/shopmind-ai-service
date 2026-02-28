@@ -27,6 +27,9 @@ class RedisCheckpointSaver(BaseCheckpointSaver):
     注意：使用同步 Redis 客户端，因为 BaseCheckpointSaver 要求同步方法
     """
     
+    # 对话列表的 Redis key 前缀
+    CONVERSATION_LIST_PREFIX = "conversation_list:"
+    
     def __init__(self, ttl: int = 7200):
         """
         初始化 Redis Checkpoint Saver
@@ -355,6 +358,157 @@ class RedisCheckpointSaver(BaseCheckpointSaver):
         except Exception as e:
             logger.error(f"获取消息历史失败: {e}", exc_info=True)
             return []
+    
+    # ========== 对话列表管理方法 ==========
+    
+    def _get_conversation_list_key(self, user_id: str) -> str:
+        """获取对话列表的 Redis key"""
+        return f"{self.CONVERSATION_LIST_PREFIX}{user_id}"
+    
+    async def get_conversation_list(self, user_id: str) -> list[dict]:
+        """
+        获取用户的所有对话列表
+        
+        Args:
+            user_id: 用户ID
+            
+        Returns:
+            对话列表，每个元素包含 session_id 和 name
+        """
+        try:
+            redis_async = await self._get_async_redis()
+            key = self._get_conversation_list_key(user_id)
+            
+            # 使用 Hash 结构存储 session_id -> name 的映射
+            conversations = await redis_async.hgetall(key)
+            
+            result = []
+            for session_id, name in conversations.items():
+                # 解码 bytes
+                session_id = session_id.decode('utf-8') if isinstance(session_id, bytes) else session_id
+                name = name.decode('utf-8') if isinstance(name, bytes) else name
+                result.append({
+                    "session_id": session_id,
+                    "name": name
+                })
+            
+            # 按更新时间排序（最新的在前）
+            # 由于没有存储更新时间，暂按 session_id 字符串排序（或保持原顺序）
+            return result
+        except Exception as e:
+            logger.error(f"获取对话列表失败: {e}", exc_info=True)
+            return []
+    
+    async def create_conversation(self, user_id: str, session_id: str, name: str) -> bool:
+        """
+        创建新对话
+        
+        Args:
+            user_id: 用户ID
+            session_id: 会话ID
+            name: 对话名称
+            
+        Returns:
+            是否创建成功
+        """
+        try:
+            redis_async = await self._get_async_redis()
+            key = self._get_conversation_list_key(user_id)
+            
+            # 保存到 Hash
+            await redis_async.hset(key, session_id, name)
+            
+            # 设置过期时间（与消息历史一致）
+            await redis_async.expire(key, self.ttl)
+            
+            logger.info(f"创建对话成功: user_id={user_id}, session_id={session_id}, name={name}")
+            return True
+        except Exception as e:
+            logger.error(f"创建对话失败: {e}", exc_info=True)
+            return False
+    
+    async def update_conversation_name(self, user_id: str, session_id: str, name: str) -> bool:
+        """
+        更新对话名称
+        
+        Args:
+            user_id: 用户ID
+            session_id: 会话ID
+            name: 新对话名称
+            
+        Returns:
+            是否更新成功
+        """
+        try:
+            redis_async = await self._get_async_redis()
+            key = self._get_conversation_list_key(user_id)
+            
+            # 如果对话不存在，则创建
+            exists = await redis_async.hexists(key, session_id)
+            if not exists:
+                logger.info(f"对话不存在，将创建: session_id={session_id}")
+            
+            # 保存或更新对话名称
+            await redis_async.hset(key, session_id, name)
+            
+            # 设置过期时间（与消息历史一致）
+            await redis_async.expire(key, self.ttl)
+            
+            logger.info(f"更新对话名称成功: session_id={session_id}, name={name}")
+            return True
+        except Exception as e:
+            logger.error(f"更新对话名称失败: {e}", exc_info=True)
+            return False
+    
+    async def delete_conversation(self, user_id: str, session_id: str) -> bool:
+        """
+        删除对话
+        
+        Args:
+            user_id: 用户ID
+            session_id: 会话ID
+            
+        Returns:
+            是否删除成功
+        """
+        try:
+            redis_async = await self._get_async_redis()
+            key = self._get_conversation_list_key(user_id)
+            
+            # 从对话列表中删除
+            await redis_async.hdel(key, session_id)
+            
+            # 清除该会话的历史消息
+            await self.clear_thread_history(session_id)
+            
+            logger.info(f"删除对话成功: session_id={session_id}")
+            return True
+        except Exception as e:
+            logger.error(f"删除对话失败: {e}", exc_info=True)
+            return False
+    
+    async def get_conversation_name(self, user_id: str, session_id: str) -> Optional[str]:
+        """
+        获取指定对话的名称
+        
+        Args:
+            user_id: 用户ID
+            session_id: 会话ID
+            
+        Returns:
+            对话名称，如果不存在返回 None
+        """
+        try:
+            redis_async = await self._get_async_redis()
+            key = self._get_conversation_list_key(user_id)
+            
+            name = await redis_async.hget(key, session_id)
+            if name:
+                return name.decode('utf-8') if isinstance(name, bytes) else name
+            return None
+        except Exception as e:
+            logger.error(f"获取对话名称失败: {e}", exc_info=True)
+            return None
 
 
 def get_redis_checkpoint_saver(ttl: int = 7200) -> RedisCheckpointSaver:

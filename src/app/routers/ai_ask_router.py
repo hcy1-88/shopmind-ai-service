@@ -3,11 +3,15 @@
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
-from app.schemas.ai_ask_schema import AIAskRequest, AIClearHistoryRequest
+from app.schemas.ai_ask_schema import (
+    AIAskRequest,
+    AIClearHistoryRequest,
+    UpdateConversationNameRequest,
+    DeleteConversationRequest,
+)
 from app.schemas.result_context import ResultContext
 from app.services.ai_chat_service import get_ai_chat_service
 from app.utils.logger import app_logger as logger
-
 
 router = APIRouter(prefix="/ai/chat", tags=["大模型对话"])
 
@@ -161,4 +165,158 @@ async def clear_history(request: AIClearHistoryRequest) -> ResultContext[dict]:
         return ResultContext.fail(
             message=f"清除历史失败: {str(e)}",
             code="CLEAR_ERROR"
+        )
+
+
+# ========== 对话列表管理接口 ==========
+
+@router.get(
+    "/conversations/{user_id}",
+    response_model=ResultContext[list[dict]],
+    summary="获取对话列表",
+    description="""
+    获取用户的所有对话列表。
+    
+    参数说明：
+    - user_id: 用户ID（必填）
+    
+    返回：
+    - 对话列表，每个元素包含 session_id 和 name
+    """,
+)
+async def get_conversations(user_id: str) -> ResultContext[list[dict]]:
+    """
+    获取用户的所有对话列表
+    """
+    try:
+        logger.info(
+            "收到获取对话列表请求",
+            extra={"user_id": user_id}
+        )
+        
+        # 获取对话服务
+        chat_service = get_ai_chat_service()
+        
+        # 获取对话列表
+        conversations = await chat_service.get_conversation_list(user_id)
+        
+        return ResultContext.ok(
+            data=conversations,
+            message="获取对话列表成功"
+        )
+            
+    except Exception as e:
+        logger.error(f"获取对话列表失败: {e}", exc_info=True)
+        return ResultContext.fail(
+            message=f"获取对话列表失败: {str(e)}",
+            code="GET_CONVERSATIONS_ERROR"
+        )
+
+
+@router.post(
+    "/conversations/update-name",
+    response_model=ResultContext[dict],
+    summary="更新对话名称",
+    description="""
+    新增对话，若有则更新对话名称。
+    
+    参数说明：
+    - user_id: 用户ID（必填）
+    - session_id: 会话ID（必填）
+    - name: 新对话名称（必填）
+    """,
+)
+async def update_conversation_name(request: UpdateConversationNameRequest) -> ResultContext[dict]:
+    """
+    更新对话名称
+    """
+    try:
+        logger.info(
+            "收到更新对话名称请求",
+            extra={
+                "user_id": request.user_id,
+                "session_id": request.session_id,
+                "conversation_name": request.name
+            }
+        )
+        
+        # 获取对话服务
+        chat_service = get_ai_chat_service()
+        
+        # 更新对话名称
+        success = await chat_service.update_conversation_name(
+            request.user_id,
+            request.session_id,
+            request.name
+        )
+        
+        if success:
+            return ResultContext.ok(
+                data={"updated": True},
+                message="更新对话名称成功"
+            )
+        else:
+            return ResultContext.fail(
+                message="更新对话名称失败",
+                code="UPDATE_NAME_FAILED"
+            )
+            
+    except Exception as e:
+        logger.error(f"更新对话名称失败: {e}", exc_info=True)
+        return ResultContext.fail(
+            message=f"更新对话名称失败: {str(e)}",
+            code="UPDATE_NAME_ERROR"
+        )
+
+
+@router.post(
+    "/conversations/delete",
+    response_model=ResultContext[dict],
+    summary="删除对话",
+    description="""
+    删除对话（包括对话历史）。
+    
+    参数说明：
+    - user_id: 用户ID（必填）
+    - session_id: 会话ID（必填）
+    """,
+)
+async def delete_conversation(request: DeleteConversationRequest) -> ResultContext[dict]:
+    """
+    删除对话
+    """
+    try:
+        logger.info(
+            "收到删除对话请求",
+            extra={
+                "user_id": request.user_id,
+                "session_id": request.session_id
+            }
+        )
+        
+        # 获取对话服务
+        chat_service = get_ai_chat_service()
+        
+        # 删除对话
+        success = await chat_service.delete_conversation(
+            request.user_id,
+            request.session_id
+        )
+        
+        if success:
+            return ResultContext.ok(
+                data={"deleted": True},
+                message="删除对话成功"
+            )
+        else:
+            return ResultContext.fail(
+                message="删除对话失败",
+                code="DELETE_FAILED"
+            )
+            
+    except Exception as e:
+        logger.error(f"删除对话失败: {e}", exc_info=True)
+        return ResultContext.fail(
+            message=f"删除对话失败: {str(e)}",
+            code="DELETE_ERROR"
         )
