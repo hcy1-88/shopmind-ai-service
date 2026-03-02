@@ -210,6 +210,7 @@ class AIChatService:
         Returns:
             对话列表
         """
+        logger.info(f"获取用户【user_id: {user_id}】的消息历史列表")
         return await self.checkpointer.get_conversation_list(user_id)
     
     async def create_conversation(self, user_id: str, session_id: str, name: str) -> bool:
