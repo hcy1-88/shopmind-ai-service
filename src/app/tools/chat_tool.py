@@ -74,7 +74,7 @@ async def get_new_product(limit: int = 3) -> list[ProductResponseDto]:
 @tool
 async def search_product(query: str, page_number: int = 1, page_size: int = 3) -> list[ProductResponseDto]:
     """
-    根据用户对商品的描述，搜索商品
+    根据用户对商品的自然语言描述，搜索商品。 注意，但不支持商品字段属性的过滤，仅仅是针对【商品标题】的关键词和语义搜索。
     Args:
         query: 用户查询，比如 拍照好看的手机、苹果笔记本、送女朋友的礼物
         page_number: 分页的页码
