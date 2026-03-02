@@ -1,5 +1,6 @@
 """AI 对话服务 - 生产级实现."""
 
+import json
 from typing import AsyncGenerator, Optional
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
@@ -109,13 +110,21 @@ class AIChatService:
     
     async def chat_stream(self, request: AIAskRequest) -> AsyncGenerator[str, None]:
         """
-        流式对话
+        流式对话（完整事件流版本）
+        
+        支持发送以下事件：
+        - thinking_start / thinking_end: AI 思考过程
+        - tool_calls_detected: 检测到工具调用
+        - tool_start: 工具开始执行
+        - tool_progress: 工具执行进度
+        - tool_complete: 工具执行完成
+        - token_stream: AI 回复的流式文本
         
         Args:
             request: 对话请求
             
         Yields:
-            AI 回复的文本片段（增量）
+            SSE 格式的事件流
         """
         try:
             # 生成 thread_id
@@ -137,17 +146,99 @@ class AIChatService:
             # 配置
             config = RunnableConfig(configurable={"thread_id": thread_id})
             
-            # 流式输出（使用单例 graph）
+            # 流式输出（使用 astream_events 捕获完整事件流）
             async for event in self.graph.astream_events(
                 {"messages": input_messages},
                 config=config,
                 version="v2",
             ):
-                # 只处理 LLM 生成的 token
-                if event["event"] == "on_chat_model_stream":
-                    content = event["data"]["chunk"].content
-                    if content:
-                        yield content
+                kind = event["event"]
+                logger.info(f"事件类型：【{kind}】")
+                name = event.get("name", "")
+                
+                # 处理 LLM 开始调用 - 思考开始
+                if kind == "on_chat_model_start":
+                    yield self._format_sse_event("thinking_start", {
+                        "message": "🧠 AI 正在思考...",
+                        "node": name
+                    })
+                
+                # 处理 LLM 调用结束 - 思考结束
+                elif kind == "on_chat_model_end":
+                    response = event.get("data", {}).get("output", {})
+                    tool_calls = getattr(response, "tool_calls", [])
+                    
+                    yield self._format_sse_event("thinking_end", {
+                        "message": "思考完成",
+                        "node": name,
+                        "has_tool_calls": len(tool_calls) > 0
+                    })
+                    
+                    # 如果有工具调用，发送工具调用检测事件
+                    if tool_calls:
+                        yield self._format_sse_event("tool_calls_detected", {
+                            "tool_calls": [
+                                {
+                                    "tool_name": call["name"],
+                                    "arguments": call["args"]
+                                }
+                                for call in tool_calls
+                            ]
+                        })
+                
+                # 处理工具调用相关事件
+                elif kind == "on_tool_start":
+                    # 工具开始调用
+                    tool_name = name
+                    data_input = event.get("data", {}).get("input", {})
+                    tool_args = {}
+                    
+                    if isinstance(data_input, dict):
+                        tool_args = {k: v for k, v in data_input.items() if k not in ["name", "id"]}
+                        tool_name = data_input.get("name", tool_name)
+                    
+                    yield self._format_sse_event("tool_start", {
+                        "tool_name": tool_name,
+                        "tool_args": tool_args,
+                        "status": "开始执行"
+                    })
+                
+                elif kind == "on_tool_end":
+                    # 工具调用结束
+                    output = event.get("data", {}).get("output", "")
+                    tool_name = name
+                    
+                    # 提取结果内容
+                    if hasattr(output, "content"):
+                        result = output.content
+                    elif isinstance(output, str):
+                        result = output
+                    else:
+                        result = str(output)
+                    
+                    yield self._format_sse_event("tool_complete", {
+                        "tool_name": tool_name,
+                        "result": result
+                    })
+                
+                # 处理流式输出 token
+                elif kind == "on_chat_model_stream":
+                    chunk = event.get("data", {}).get("chunk", "")
+                    if chunk:
+                        content = ""
+                        if hasattr(chunk, 'content'):
+                            content = chunk.content
+                        elif isinstance(chunk, str):
+                            content = chunk
+                        
+                        if content:
+                            yield self._format_sse_event("token_stream", {
+                                "content": content,
+                                "node": name
+                            })
+            
+            # 发送完成事件
+            yield self._format_sse_event("complete", {"message": "对话完成"})
             
             logger.info(
                 f"流式对话完成",
@@ -156,7 +247,11 @@ class AIChatService:
                         
         except Exception as e:
             logger.error(f"流式对话失败: {e}", exc_info=True)
-            yield f"\n\n[系统错误: {str(e)}]"
+            yield self._format_sse_event("error", {"message": str(e)})
+    
+    def _format_sse_event(self, event_type: str, data: dict) -> str:
+        """格式化 SSE 事件"""
+        return f"data: {json.dumps({'type': event_type, 'data': data})}\n\n"
     
     async def clear_history(self, session_id: str) -> bool:
         """
