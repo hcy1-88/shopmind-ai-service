@@ -198,6 +198,7 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
     1. **原子化拆分**: 如果用户的一句话包含多个独立的需求（例如："我想买双鞋，另外问问怎么退货"），必须将其拆分为两个独立的 `IntentItem`。
        - 错误做法：将整句标记为 SHOPPING。
        - 正确做法：生成两个 item: [{"sub_query": "我想买双鞋", "intent": "SHOPPING"}, {"sub_query": "怎么退货", "intent": "PLATFORM"}]。
+       - 再比如：用户说“给我推荐一只口红和一本小说”，生成两个 item，因为是两个购物请求，[{"sub_query": "我想买一只口红", "intent": "SHOPPING"}, {"sub_query": "我想买一本小说", "intent": "SHOPPING"}]。
 
     2. **优先级与过滤**:
        - 如果用户输入纯属闲聊（多个子问题都是闲聊），只返回一个 CHITCHAT 类型的 item。
