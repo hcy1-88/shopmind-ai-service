@@ -27,7 +27,7 @@ async def query_rewritten_node(state: ShopmindAgentState, runtime: Runtime[Shopm
     llm = context.llm
 
     # 获取历史消息（用于指代消除和信息补全）
-    messages = state.get("messages", [])
+    messages = state.messages
     history_text = _build_history_context(messages)
 
     # 调用 LLM 进行查询重写
