@@ -2,7 +2,7 @@
 
 import json
 from typing import AsyncGenerator, Optional
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langchain.agents import create_agent
 
@@ -35,7 +35,9 @@ class AIChatService:
         chat_config = get_nacos_client().get_chat_config()
         ttl = chat_config.get("checkpoint_expire", 2)
         self.checkpointer = get_redis_checkpoint_saver(ttl=ttl*3600)
-        
+        self.max_clarification_count = chat_config.get("max_clarification_count", 3)
+        self.max_history_task_count = chat_config.get("max_history_task_count", 3)
+
         # 系统提示词
         self.system_prompt = (
             "你是 ShopMind 智能电商平台的 AI 购物助手，名字叫「小购」。\n"
@@ -149,7 +151,10 @@ class AIChatService:
             config = RunnableConfig(configurable={"thread_id": thread_id})
 
             # 上下文
-            context = ShopmindAssistantContext(llm=self.llm, thread_id=thread_id)
+            context = ShopmindAssistantContext(llm=self.llm,
+                                               thread_id=thread_id,
+                                               max_clarification_count=self.max_clarification_count,
+                                               max_history_task_count=self.max_history_task_count)
             
             # 流式输出（使用 astream_events 捕获完整事件流）
             async for event in self.graph.astream_events(

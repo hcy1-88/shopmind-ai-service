@@ -39,6 +39,7 @@ class ProductResponseDto(CamelCaseModel):
     {
 		"id": "264498826428022784",
 		"name": "Apple苹果笔记本电脑MacBookPro13寸15办公设计Air超薄",
+		"price": 3000,
 		"priceRange": {
 			"min": 3000,
 			"max": 5000
