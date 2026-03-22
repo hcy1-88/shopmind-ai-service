@@ -47,10 +47,10 @@ async def intent_decomposer_node(state: ShopmindAgentState, runtime: Runtime[Sho
     max_history_task_count = context.max_history_task_count
 
     # 1. 意图识别：购物、平台规则、闲聊，并提取槽位
-    subtasks = state.sub_tasks
+    subtasks = state.get("sub_tasks", [])
     # 过滤：只发送最近的 N 个未完成的活跃子任务
     filtered_subtasks = _filter_active_subtasks(subtasks, max_count=max_history_task_count)
-    intent_resp = await intent_analyze(llm, state.rewritten_query, filtered_subtasks)
+    intent_resp = await intent_analyze(llm, state.get("rewritten_query", ""), filtered_subtasks)
     logger.info(f"thread_id: {context.thread_id}, 意图识别结果：{intent_resp}")
 
     # 2. 处理每个意图项
@@ -99,10 +99,10 @@ async def intent_decomposer_node(state: ShopmindAgentState, runtime: Runtime[Sho
                 current_subtask = new_subtask
                 subtasks.append(new_subtask)
         # 加入本轮的目标任务
-        state.current_tasks.append(current_subtask)
+        state["current_tasks"].append(current_subtask)
 
     # 3. 更新 state
-    state.sub_tasks = subtasks
+    state["sub_tasks"] = subtasks
     return state
 
 

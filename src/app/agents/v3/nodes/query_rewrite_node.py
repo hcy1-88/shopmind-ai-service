@@ -27,17 +27,14 @@ async def query_rewritten_node(state: ShopmindAgentState, runtime: Runtime[Shopm
     llm = context.llm
 
     # 获取历史消息（用于指代消除和信息补全）
-    messages = state.messages
+    messages = state.get("messages", [])
     history_text = _build_history_context(messages)
 
     # 调用 LLM 进行查询重写
-    rewritten_query = await query_rewrite(llm, state.original_query, history_text)
-
-    # 更新 state
-    state.rewritten_query= rewritten_query
-
+    rewritten_query = await query_rewrite(llm, state.get("original_query", ""), history_text)
     logger.info(f"thread_id: {context.thread_id}, 查询重写结果: {rewritten_query}")
-    return state
+
+    return {"rewritten_query": rewritten_query}
 
 
 def _build_history_context(messages: list) -> str:

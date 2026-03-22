@@ -7,11 +7,13 @@
 """
 from datetime import datetime
 from enum import Enum
-from typing import Annotated
+from typing import TypedDict, Annotated
+
+from langgraph.graph import add_messages
+
 from app.utils.id_util import gen_id
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage
-from langgraph.graph import add_messages
 from pydantic import BaseModel, Field
 
 
@@ -80,10 +82,11 @@ class ShopmindAssistantContext(BaseModel):
     max_history_task_count: int
 
 
-class ShopmindAgentState(BaseModel):
-    messages: Annotated[list[BaseMessage], add_messages] = []
-    original_query: str = Field(description="用户原始问题输入")
-    rewritten_query: str = Field(default=None, description="重写后的查询（消除指代、补充信息后的完整query）")
-    sub_tasks: list[SubTask] = Field(default_factory=list, description="子任务列表，可包含不同类型的 SubTask")
-    current_tasks: list[SubTask] = Field(default_factory=list, description="本轮用户的提问，涉及到的子任务")
+class ShopmindAgentState(TypedDict):
+    """Agent 状态类型，使用 TypedDict 更灵活，方便后续节点添加状态"""
+    messages: Annotated[list[BaseMessage], add_messages]
+    original_query: str
+    rewritten_query: str | None
+    sub_tasks: list[SubTask]
+    current_tasks: list[SubTask]
 
