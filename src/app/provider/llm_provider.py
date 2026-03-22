@@ -32,6 +32,13 @@ class LLMProvider(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_reasoner_model(self, **kwargs) -> BaseChatModel:
+        """
+        Get reasoner model instance.
+        """
+        pass
+
 
 class OpenAIProvider(LLMProvider):
     """OpenAI LLM provider."""
@@ -87,6 +94,9 @@ class OpenAIProvider(LLMProvider):
 
         return ChatOpenAI(**model_kwargs)
 
+    def get_reasoner_model(self, **kwargs) -> BaseChatModel:
+        return self.get_chat_model()
+
 
 class TongyiProvider(LLMProvider):
     """Tongyi (Qwen) LLM provider - placeholder for future implementation."""
@@ -107,3 +117,6 @@ class TongyiProvider(LLMProvider):
     def get_vision_model(self, **kwargs) -> BaseChatModel:
         """Get Tongyi vision model."""
         return OpenAIProvider(self.config).get_vision_model(**kwargs)
+
+    def get_reasoner_model(self, **kwargs) -> BaseChatModel:
+        return self.get_chat_model()

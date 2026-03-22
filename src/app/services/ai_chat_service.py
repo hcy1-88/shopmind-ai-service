@@ -5,6 +5,8 @@ from typing import AsyncGenerator, Optional
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
 from langchain.agents import create_agent
+
+from app.agents.v3.schema import ShopmindAssistantContext
 from app.config.nacos_client import get_nacos_client
 from app.schemas.ai_ask_schema import AIAskRequest
 from app.services import llm_service
@@ -91,7 +93,7 @@ class AIChatService:
             编译后的 LangGraph 图实例（带 RAG 工具的 Agent）
         """
         # 获取 LLM
-        llm = llm_service.get_llm_service().get_chat_model()
+        self.llm = llm_service.get_llm_service().get_chat_model()
         
         # 工具
         tools = [platform_knowledge_search, get_new_product, search_product, get_product_detail]
@@ -99,7 +101,7 @@ class AIChatService:
 
         # Agent
         graph = create_agent(
-            llm,
+            self.llm,
             tools=tools,
             checkpointer=self.checkpointer,
             system_prompt=self.system_prompt  # 使用定义的系统提示词
@@ -145,10 +147,14 @@ class AIChatService:
             
             # 配置
             config = RunnableConfig(configurable={"thread_id": thread_id})
+
+            # 上下文
+            context = ShopmindAssistantContext(llm=self.llm, thread_id=thread_id)
             
             # 流式输出（使用 astream_events 捕获完整事件流）
             async for event in self.graph.astream_events(
                 {"messages": input_messages},
+                context=context,
                 config=config,
                 version="v2",
             ):

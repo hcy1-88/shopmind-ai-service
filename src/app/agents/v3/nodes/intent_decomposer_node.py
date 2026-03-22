@@ -18,7 +18,7 @@ async def intent_decomposer_node(state: ShopmindAgentState, runtime: Runtime[Sho
     llm = context.llm
     # 1, 意图识别：购物、平台规则、闲聊
     subtasks = state.get("sub_tasks", [])
-    intent_resp = await intent_analyze(llm, state["rewritten_query"], subtasks)
+    intent_resp = await intent_analyze(llm, state.rewritten_query, subtasks)
     logger.info(f"thread_id: {context.thread_id}, 意图识别结果：{intent_resp}")
     for intent_item in intent_resp.intent_items:
         # 2，如果是购物，则需要判断是新的购物意图，还是旧的购物意图
@@ -45,7 +45,11 @@ async def intent_decomposer_node(state: ShopmindAgentState, runtime: Runtime[Sho
 
 
 async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> IntentResponse:
-    """意图分解和识别"""
+    """
+    意图分解和识别
+    Args:
+        - user_query: 根据历史消息重写过后的 query
+    """
     parser = JsonOutputParser(pydantic_object=IntentResponse)
 
     # 构建历史 subtasks 上下文
@@ -77,7 +81,7 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
 
     # Decomposition Rules (关键步骤)
     1. **原子化拆分**: 如果用户的一句话包含多个独立的需求（例如："我想买双鞋，另外问问怎么退货"），必须将其拆分为两个独立的 `IntentItem`。
-       - 错误做法：将整句标记为 SHOPPING。
+       - 错误做法：将整句标记为 SHOPPING，或者扩展出新的问题，这都是错的。
        - 正确做法：生成两个 item: [{"sub_query": "我想买双鞋", "intent": "SHOPPING"}, {"sub_query": "怎么退货", "intent": "PLATFORM"}]。
 
     2. **优先级与过滤**:
