@@ -95,7 +95,7 @@ async def search_product(query: str, page_number: int = 1, page_size: int = 3) -
 
 
 @tool
-async def get_product_detail(product_id: int) -> ProductResponseDto:
+async def get_product_detail(product_id: int) -> ProductResponseDto | None:
     """
     根据商品ID查询商品详情，用于获取商品的完整信息包括价格、描述、库存、款式等，如果返回为空，说明商品详情获取失败！
     Args:
