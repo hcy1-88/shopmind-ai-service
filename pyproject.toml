@@ -28,6 +28,7 @@ dependencies = [
    "llama-index-storage-index-store-postgres>=0.5.1",
    "python-multipart>=0.0.21",
    "llama-index-embeddings-dashscope>=0.4.1",
+   "langchain-tavily>=0.2.17",
 ]
 
 [build-system]

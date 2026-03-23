@@ -1,15 +1,63 @@
 """
 @File       : chat_tool.py
-@Description:
+@Description: Agent 工具集
 
 @Time       : 2026/1/6 10:20
 @Author     : hcy18
 """
+import httpx
 from langchain_core.tools import tool
+from langchain_tavily import TavilySearch
+
+from app.config.nacos_client import get_nacos_client
 from app.utils.logger import app_logger as logger
 from app.clients.product_service import get_product_service_client
 from app.schemas.product_response_schema import ProductResponseDto
 from app.services.rag_service import get_rag_service
+
+
+# ========== Helper Functions ==========
+
+
+def _get_tavily_api_key() -> str:
+    """从 chat_config 获取 Tavily API Key"""
+    chat_config = get_nacos_client().get_chat_config()
+    return chat_config.get("tavily_api_key", "")
+
+
+def _get_hefeng_api_key() -> str:
+    """从 chat_config 获取和风天气 API Key"""
+    chat_config = get_nacos_client().get_chat_config()
+    return chat_config.get("hefeng_weather_api_key", "")
+
+
+async def _city_lookup(city: str) -> str | None:
+    """
+    根据城市名称查询 location_id
+
+    Args:
+        city: 城市名称，如 "北京"
+
+    Returns:
+        location_id 或 None（未找到）
+    """
+    api_key = _get_hefeng_api_key()
+    if not api_key:
+        return None
+
+    url = f"https://geo.qweather.com/v2/city/lookup?location={city}&key={api_key}"
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, timeout=10.0)
+            data = response.json()
+            if data.get("code") == "200" and data.get("location"):
+                return data["location"][0].get("id")
+    except Exception as e:
+        logger.error(f"[城市查询] 查询失败: {e}")
+    return None
+
+
+# ========== Product Tools ==========
 
 
 @tool
@@ -110,3 +158,146 @@ async def get_product_detail(product_id: int) -> ProductResponseDto | None:
     except Exception as e:
         logger.error(f"[商品查询] 获取商品详情失败: {e}", exc_info=True)
         return None
+
+
+# ========== External Tools ==========
+
+
+@tool
+def tavily_search(query: str) -> str:
+    """
+    Tavily 联网搜索工具，用于搜索网络上最新信息和回答实时问题。
+
+    Args:
+        query: 搜索关键词或问题，例如 "今天有什么科技新闻"
+
+    Returns:
+        搜索结果摘要，包含标题、URL 和内容摘要
+    """
+    api_key = _get_tavily_api_key()
+    if not api_key:
+        return "Tavily API Key 未配置，请在 chat_config 中配置 tavily_api_key"
+
+    try:
+        logger.info(f"[Tavily搜索] query: {query}")
+        tavily = TavilySearch(max_results=3, tavily_api_key=api_key)
+        result = tavily.invoke(query)
+        logger.info(f"[Tavily搜索] 成功")
+        return result
+    except Exception as e:
+        logger.error(f"[Tavily搜索] 失败: {e}", exc_info=True)
+        return f"搜索失败: {str(e)}"
+
+
+@tool
+async def get_current_weather(city: str) -> str:
+    """
+    查询城市实时天气。
+
+    Args:
+        city: 城市名称，例如 "北京"、"上海"、"广州"
+
+    Returns:
+        格式化后的天气信息，包含温度、湿度、风力等
+    """
+    api_key = _get_hefeng_api_key()
+    if not api_key:
+        return "和风天气 API Key 未配置，请在 chat_config 中配置 hefeng_weather_api_key"
+
+    try:
+        logger.info(f"[实时天气] 查询城市: {city}")
+
+        # Step 1: 城市 lookup 获取 location_id
+        location_id = await _city_lookup(city)
+        if not location_id:
+            logger.warning(f"[实时天气] 城市未找到: {city}")
+            return f"未找到城市 '{city}'，请确认城市名称是否正确"
+
+        # Step 2: 查询实时天气
+        url = f"https://weather.qweather.com/v7/weather/now?location={location_id}&key={api_key}"
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, timeout=10.0)
+            data = response.json()
+
+        if data.get("code") != "200":
+            return f"查询天气失败: {data.get('msg', '未知错误')}"
+
+        weather = data.get("now", {})
+        result = (
+            f"【{city}实时天气】\n"
+            f"- 温度: {weather.get('temp', 'N/A')}°C\n"
+            f"- 体感温度: {weather.get('feelsLike', 'N/A')}°C\n"
+            f"- 天气: {weather.get('text', 'N/A')}\n"
+            f"- 风速: {weather.get('windSpeed', 'N/A')} km/h（{weather.get('windDir', 'N/A')}）\n"
+            f"- 湿度: {weather.get('humidity', 'N/A')}%\n"
+            f"- 能见度: {weather.get('vis', 'N/A')} km\n"
+            f"- 气压: {weather.get('pressure', 'N/A')} hPa\n"
+            f"- 更新时间: {data.get('updateTime', 'N/A')}"
+        )
+        logger.info(f"[实时天气] 成功: {city}")
+        return result
+
+    except Exception as e:
+        logger.error(f"[实时天气] 失败: {e}", exc_info=True)
+        return f"查询天气失败: {str(e)}"
+
+
+@tool
+async def get_forecast_weather(city: str, days: int = 3) -> str:
+    """
+    查询城市天气预报，支持未来 3-30 天。
+
+    Args:
+        city: 城市名称，例如 "北京"、"上海"
+        days: 预报天数，取值范围 3-30，默认为 3
+
+    Returns:
+        格式化后的天气预报信息
+    """
+    api_key = _get_hefeng_api_key()
+    if not api_key:
+        return "和风天气 API Key 未配置，请在 chat_config 中配置 hefeng_weather_api_key"
+
+    if days < 3 or days > 30:
+        return "预报天数必须在 3-30 天之间"
+
+    try:
+        logger.info(f"[天气预报] 查询城市: {city}, 天数: {days}")
+
+        # Step 1: 城市 lookup 获取 location_id
+        location_id = await _city_lookup(city)
+        if not location_id:
+            logger.warning(f"[天气预报] 城市未找到: {city}")
+            return f"未找到城市 '{city}'，请确认城市名称是否正确"
+
+        # Step 2: 查询天气预报
+        url = f"https://weather.qweather.com/v7/weather/{days}d?location={location_id}&key={api_key}"
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, timeout=10.0)
+            data = response.json()
+
+        if data.get("code") != "200":
+            return f"查询天气失败: {data.get('msg', '未知错误')}"
+
+        daily_list = data.get("daily", [])
+        if not daily_list:
+            return f"未找到 {city} 的天气预报数据"
+
+        # 格式化输出
+        result_parts = [f"【{city}天气预报】（共 {len(daily_list)} 天）\n"]
+        for i, day in enumerate(daily_list, 1):
+            result_parts.append(
+                f"\n📅 第 {i} 天 ({day.get('fxDate', 'N/A')})\n"
+                f"   天气: {day.get('textDay', 'N/A')} → {day.get('textNight', 'N/A')}\n"
+                f"   温度: {day.get('tempMin', 'N/A')}°C ~ {day.get('tempMax', 'N/A')}°C\n"
+                f"   降水概率: {day.get('pop', 'N/A')}%\n"
+                f"   风速: {day.get('windSpeedDay', 'N/A')} km/h（{day.get('windDirDay', 'N/A')}）"
+            )
+
+        result = "\n".join(result_parts)
+        logger.info(f"[天气预报] 成功: {city}, {len(daily_list)} 天")
+        return result
+
+    except Exception as e:
+        logger.error(f"[天气预报] 失败: {e}", exc_info=True)
+        return f"查询天气失败: {str(e)}"
