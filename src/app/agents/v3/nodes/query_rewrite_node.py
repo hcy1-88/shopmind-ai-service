@@ -11,6 +11,7 @@ from app.agents.v3.schema import (
     ShopmindAgentState,
     ShopmindAssistantContext,
 )
+from app.agents.v3.utils import build_history_context
 from app.utils.logger import app_logger as logger
 
 
@@ -28,30 +29,13 @@ async def query_rewritten_node(state: ShopmindAgentState, runtime: Runtime[Shopm
 
     # 获取历史消息（用于指代消除和信息补全）
     messages = state.get("messages", [])
-    history_text = _build_history_context(messages)
+    history_text = build_history_context(messages)
 
     # 调用 LLM 进行查询重写
     rewritten_query = await query_rewrite(llm, state.get("original_query", ""), history_text)
     logger.info(f"thread_id: {context.thread_id}, 查询重写结果: {rewritten_query}")
 
     return {"rewritten_query": rewritten_query}
-
-
-def _build_history_context(messages: list) -> str:
-    """构建历史对话上下文"""
-    if not messages:
-        return "无历史消息"
-
-    history_parts = []
-    for msg in messages[-5:]:  # 只取最近5条消息
-        role = "用户" if msg.type == "human" else "助手"
-        content = msg.content if isinstance(msg.content, str) else str(msg.content)
-        # 截断过长内容
-        if len(content) > 200:
-            content = content[:200] + "..."
-        history_parts.append(f"{role}: {content}")
-
-    return "\n".join(history_parts)
 
 
 async def query_rewrite(
