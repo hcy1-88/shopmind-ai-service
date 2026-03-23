@@ -12,6 +12,9 @@ from typing import TypedDict, Annotated
 
 from langgraph.graph import add_messages
 
+from app.schemas.page_result_schema import PageResult
+from app.schemas.product_response_schema import ProductResponseDto
+
 from app.utils.id_util import gen_id
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage
@@ -40,6 +43,7 @@ class IntentItem(BaseModel):
     matched_task_id: str | None = None
     extracted_slots: dict = Field(default_factory=dict, description="从用户输入提取的槽位信息")
     explicit_search: bool = Field(default=False, description="用户是否明确表示要立即搜索（如'搜一下'、'就这个了'）")
+    is_replace_products: bool = Field(default=False, description="用户是否要求'换一批'（如'换一批'、'换一个'），为 true 时 filter_node 排除 has_searched_product_ids")
 
 
 class IntentResponse(BaseModel):
@@ -50,7 +54,7 @@ class SubTask(BaseModel):
     """SubTask 基类 - 所有意图类型的通用父类"""
     task_id: str = Field(default_factory=gen_id)
     category: IntentCategory = Field(default=None, description="意图识别的分类")
-    original_query: str = Field(description="重写后的子问题")
+    sub_query: str = Field(description="重写后的子问题")
     status: TaskStatus
     clarification_count: int = Field(default=0, description="已澄清次数，最多3次")
     created_at: datetime = Field(default_factory=datetime.now)
@@ -63,6 +67,11 @@ class ShoppingSubTask(SubTask):
     keywords: list[str] = Field(default_factory=list, description="搜索关键词（扩展词）")
     filters: dict = Field(default_factory=dict, description="过滤条件，如价格区间、颜色等")
     has_searched_product_id: list[int] = Field(default_factory=list, description="已经搜索过的商品，用户要求换一批时有用")
+    # 已经使用过的搜索页号
+    searched_pages: list[int]
+    is_replace_products: bool = Field(default=False, description="是否为换一批场景，为 true 时 filter_node 排除已推荐商品")
+    # 一次对话内，调用搜索工具的循环次数（filter_node -> ready_node）
+    max_search_loop: int
 
 
 class PlatformSubTask(SubTask):
@@ -82,6 +91,8 @@ class ShopmindAssistantContext(BaseModel):
     max_clarification_count: int
     # 限制活跃的历史子任务（防止意图识别时上下文太长）
     max_history_task_count: int
+    # 一次对话内，调用搜索工具的循环次数（filter_node -> ready_node）
+    max_search_loop: int
 
 
 class ShopmindAgentState(TypedDict):
@@ -93,3 +104,52 @@ class ShopmindAgentState(TypedDict):
     current_tasks: list[SubTask]
     # 聚合器收集任务结果
     sub_task_results: Annotated[list[SubTask], operator.add]
+    # Agent 最终发送给用户的回复
+    answer: str | None
+
+
+## 平台规则节点的状态
+class PlatformNodeState(BaseModel):
+    sub_task: PlatformSubTask
+    messages: Annotated[list[BaseMessage], add_messages]
+
+
+## 闲聊节点的状态
+class ChitChatNodeState(BaseModel):
+    """闲聊节点状态"""
+    sub_task: ChitchatSubTask
+    messages: Annotated[list[BaseMessage], add_messages]
+
+
+## shopping 节点的状态
+class ShoppingNodeState(BaseModel):
+    sub_task: ShoppingSubTask
+    messages: Annotated[list[BaseMessage], add_messages]
+
+
+## ======================= 导购任务子图状态 =================
+class ShoppingSubgraphState(TypedDict):
+    # 导购任务
+    task: ShoppingSubTask
+    # 子图消息
+    subgraph_messages: Annotated[list[BaseMessage], add_messages]  # 子图的消息
+    # 每次搜索后的结果
+    searched_res: Annotated[list[PageResult[list[ProductResponseDto]]], operator.add]
+    # 搜到到的商品详情
+    searched_details: Annotated[list[ProductResponseDto], operator.add]
+
+    # LLM 语义过滤后需要保留的商品 ID 列表
+    filtered_product_ids: list[int]
+    # 需要保留的商品详情
+    product_after_filter: list[ProductResponseDto]
+
+    # 当前搜索循环次数，用于控制分页上限
+    search_count_loop: int
+
+    # 父子图的同名 key 是共享的
+    messages: Annotated[list[BaseMessage], operator.add]      # 父图的消息
+
+
+class FilterResult(BaseModel):
+    """filter_node 输出解析器使用的 Pydantic 模型"""
+    filtered_product_ids: list[int] = Field(description="过滤后需要保留的商品 ID 列表")

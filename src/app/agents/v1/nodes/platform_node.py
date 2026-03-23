@@ -9,19 +9,15 @@ from langchain_core.messages import BaseMessage, HumanMessage
 from langgraph.runtime import Runtime
 from pydantic import BaseModel
 
-from app.agents.v3.schema import (
+from app.agents.v1.schema import (
     ShopmindAssistantContext,
     PlatformSubTask,
-    TaskStatus,
+    TaskStatus, PlatformNodeState,
 )
-from app.agents.v3.utils import build_history_context
+from app.agents.v1.utils import build_history_context
 from app.tools.chat_tool import platform_knowledge_search
 from app.utils.logger import app_logger as logger
 
-
-class PlatformNodeState(BaseModel):
-    sub_task: PlatformSubTask
-    messages: list[BaseMessage]
 
 
 async def platform_node(state: PlatformNodeState, runtime: Runtime[ShopmindAssistantContext]):
@@ -40,7 +36,7 @@ async def platform_node(state: PlatformNodeState, runtime: Runtime[ShopmindAssis
     messages = state.messages
 
     thread_id = context.thread_id
-    query = sub_task.original_query
+    query = sub_task.sub_query
     history_text = build_history_context(messages)
     logger.info(f"[PlatformNode] thread_id: {thread_id}, query: {query}, history: {history_text[:100]}...")
 

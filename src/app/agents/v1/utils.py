@@ -1,6 +1,6 @@
 """
 @File       : utils.py
-@Description: agents v3 公共工具方法
+@Description: agents v1 公共工具方法
 
 @Time       : 2026/3/23
 @Author     : hcy18
@@ -10,7 +10,7 @@ from langchain_core.messages import BaseMessage
 
 def build_history_context(messages: list[BaseMessage]) -> str:
     """
-    构建历史对话上下文
+    构建历史对话上下文 todo 最佳方案可能是 sub_task 增量的记录任务摘要，所以上下文构建从 sub_task 摘要里取，而不是每次截取最近 5 条
 
     Args:
         messages: 对话消息列表

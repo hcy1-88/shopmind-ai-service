@@ -5,11 +5,18 @@
 @Time       : 2026/1/6 10:20
 @Author     : hcy18
 """
-import httpx
-from langchain_core.tools import tool
-from langchain_tavily import TavilySearch
+from typing import Annotated
 
+import httpx
+from langchain_core.messages import ToolMessage
+from langchain_core.tools import tool, InjectedToolCallId
+from langchain_tavily import TavilySearch
+from langgraph.prebuilt import InjectedState
+from langgraph.types import Command
+
+from app.agents.v1.schema import ShoppingSubTask
 from app.config.nacos_client import get_nacos_client
+from app.schemas.page_result_schema import PageResult
 from app.utils.logger import app_logger as logger
 from app.clients.product_service import get_product_service_client
 from app.schemas.product_response_schema import ProductResponseDto
@@ -120,44 +127,66 @@ async def get_new_product(limit: int = 3) -> list[ProductResponseDto]:
 
 
 @tool
-async def search_product(query: str, page_number: int = 1, page_size: int = 3) -> list[ProductResponseDto]:
+async def search_product(
+        tool_call_id: Annotated[str, InjectedToolCallId],
+        task: Annotated[ShoppingSubTask, InjectedState("task")],
+        query: str,
+        page_number: int = 1):
     """
     根据用户对商品的自然语言描述，搜索商品。 注意，但不支持商品字段属性的过滤，仅仅是针对【商品标题】的关键词和语义搜索。
+    Page_Size 一页的大小固定为 5
     Args:
+        tool_call_id: tool_call_id 注入
+        task: 导购任务对象
         query: 用户查询，比如 拍照好看的手机、苹果笔记本、送女朋友的礼物
         page_number: 分页的页码
-        page_size: 一页的大小（不宜过大，不用超过 5，不然消息太长）
+    Returns：
+        - 商品的基本信息，但是不包含商品的 SKU 信息 （如果需要商品详情，请调用 get_product_detail 工具获取 sku 详细信息）
     """
+    page_size = 5
     try:
         logger.info(f"[商品查询] 搜索商品，query={query}, page={page_number}, size={page_size}")
         product_client = await get_product_service_client()
-        result = await product_client.search_products(query, page_number, page_size)
-        logger.info(f"[商品查询] 搜索到 {len(result)} 个商品")
-        if result:
-            product_names = [p.name for p in result]
-            logger.debug(f"[商品查询结果] {product_names}")
-        return result
+        result: PageResult[list[ProductResponseDto]] = await product_client.search_products(query, page_number, page_size)
+        logger.info(f"[商品查询] 搜索到 {len(result.data)} 个商品")
+        # 记录搜索了哪一页
+        task.searched_pages.append(page_number)
+        page_json = result.model_dump_json()
+        return Command(update={
+            "subgraph_messages": [ToolMessage(content=page_json, tool_call_id=tool_call_id)],
+            "searched_res": [result],
+            "task": task
+        })
     except Exception as e:
         logger.error(f"[商品查询] 搜索商品失败: {e}", exc_info=True)
-        return []
+        return Command(update={
+            "subgraph_messages": [ToolMessage(content="商品搜索服务失败！不可使用！", tool_call_id=tool_call_id)],
+        })
 
 
 @tool
-async def get_product_detail(product_id: int) -> ProductResponseDto | None:
+async def get_product_detail(product_id: int, tool_call_id: Annotated[str, InjectedToolCallId]):
     """
     根据商品ID查询商品详情，用于获取商品的完整信息包括价格、描述、库存、款式等，如果返回为空，说明商品详情获取失败！
     Args:
         product_id: 商品ID
+        tool_call_id: tool_call_id 注入
     """
     try:
         logger.info(f"[商品查询] 获取商品详情，product_id={product_id}")
         product_client = await get_product_service_client()
-        result = await product_client.get_product_by_id(product_id)
+        result: ProductResponseDto = await product_client.get_product_by_id(product_id)
         logger.info(f"[商品查询] 获取商品详情成功！product_name={result.name}")
-        return result
+        product_json = result.model_dump_json()
+        return Command(update={
+            "subgraph_messages": [ToolMessage(content=product_json, tool_call_id=tool_call_id)],
+            "searched_details": [result]
+        })
     except Exception as e:
         logger.error(f"[商品查询] 获取商品详情失败: {e}", exc_info=True)
-        return None
+        return Command(update={
+            "subgraph_messages": [ToolMessage(content="商品详情获取失败！服务不可使用！", tool_call_id=tool_call_id)],
+        })
 
 
 # ========== External Tools ==========
@@ -177,7 +206,6 @@ def tavily_search(query: str) -> str:
     api_key = _get_tavily_api_key()
     if not api_key:
         return "Tavily API Key 未配置，请在 chat_config 中配置 tavily_api_key"
-
     try:
         logger.info(f"[Tavily搜索] query: {query}")
         tavily = TavilySearch(max_results=3, tavily_api_key=api_key)

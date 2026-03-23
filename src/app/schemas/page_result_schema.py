@@ -17,4 +17,5 @@ class PageResult(CamelCaseModel, Generic[T]):
     total: int = Field(..., description="总记录数")
     page_number: int = Field(..., description="当前页码")
     page_size: int = Field(...,  description="每页大小")
+    message: str = Field(default=None, description="描述说明")
 

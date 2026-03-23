@@ -1,5 +1,5 @@
 """
-@File       : chitchat_service.py
+@File       : chitchat_agent.py
 @Description: 闲聊服务 - 使用 ReAct Agent 处理闲聊、天气查询、联网搜索等
 
 @Time       : 2026/3/23
@@ -10,8 +10,8 @@ from typing import Optional
 from langchain.agents import create_agent
 from langchain_core.messages import BaseMessage
 
-from app.agents.v3.schema import ShopmindAssistantContext
-from app.agents.v3.utils import build_history_context
+from app.agents.v1.schema import ShopmindAssistantContext
+from app.agents.v1.utils import build_history_context
 from app.services import llm_service
 from app.tools.chat_tool import tavily_search, get_current_weather, get_forecast_weather
 from app.utils.logger import app_logger as logger

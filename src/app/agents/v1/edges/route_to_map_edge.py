@@ -7,7 +7,7 @@
 """
 from langgraph.types import Send
 
-from app.agents.v3.schema import ShopmindAgentState, ShopmindAssistantContext, IntentCategory
+from app.agents.v1.schema import ShopmindAgentState, ShopmindAssistantContext, IntentCategory
 from app.utils.logger import app_logger as logger
 
 async def route_to_map_node_edge(state: ShopmindAgentState, context: ShopmindAssistantContext):
@@ -21,7 +21,7 @@ async def route_to_map_node_edge(state: ShopmindAgentState, context: ShopmindAss
     send_list = []
     for task in current_tasks:
         if task.category == IntentCategory.SHOPPING:
-            send_list.append(Send("shopping_subgraph_node", {"sub_task": task}))
+            send_list.append(Send("shopping_subgraph_node", {"sub_task": task, "messages": state["messages"]}))
         elif task.category == IntentCategory.PLATFORM:
             send_list.append(Send("platform_node", {"sub_task": task, "messages": state["messages"]}))
         else:

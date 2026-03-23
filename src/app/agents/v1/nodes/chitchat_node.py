@@ -5,19 +5,10 @@
 @Time       : 2026/3/23 2:08
 @Author     : hcy18
 """
-from langchain_core.messages import BaseMessage
 from langgraph.runtime import Runtime
-from pydantic import BaseModel
-
-from app.agents.v3.subagents.chitchat_service import get_chitchat_service
-from app.agents.v3.schema import ChitchatSubTask, ShopmindAssistantContext, TaskStatus
+from app.agents.v1.subagents.chitchat_agent import get_chitchat_service
+from app.agents.v1.schema import ChitchatSubTask, ShopmindAssistantContext, TaskStatus, ChitChatNodeState
 from app.utils.logger import app_logger as logger
-
-
-class ChitChatNodeState(BaseModel):
-    """闲聊节点状态"""
-    sub_task: ChitchatSubTask
-    messages: list[BaseMessage]
 
 
 async def chitchat_node(state: ChitChatNodeState, runtime: Runtime[ShopmindAssistantContext]):
@@ -35,7 +26,7 @@ async def chitchat_node(state: ChitChatNodeState, runtime: Runtime[ShopmindAssis
     messages = state.messages
 
     thread_id = context.thread_id
-    query = sub_task.original_query
+    query = sub_task.sub_query
     logger.info(f"[ChitChatNode] thread_id: {thread_id}, query: {query}")
 
     try:

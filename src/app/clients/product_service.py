@@ -129,7 +129,7 @@ class ProductServiceClient:
             )
             raise
 
-    async def search_products(self, query: str, page_number: int = 1, page_size: int = 10) -> list[ProductResponseDto]:
+    async def search_products(self, query: str, page_number: int = 1, page_size: int = 10) -> PageResult[list[ProductResponseDto]]:
         """
         根据输入的查询，搜索商品
         Args:
@@ -156,7 +156,7 @@ class ProductServiceClient:
                 products_result_context = ResultContext[PageResult[list[ProductResponseDto]]](**response.json())
 
                 if products_result_context.success:
-                    products = products_result_context.data.data
+                    products = products_result_context.data
                     logger.info("搜索新商品成功！")
                     return products
                 else:

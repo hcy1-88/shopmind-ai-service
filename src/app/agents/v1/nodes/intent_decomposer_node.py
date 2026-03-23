@@ -8,7 +8,7 @@
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.runtime import Runtime
-from app.agents.v3.schema import (
+from app.agents.v1.schema import (
     ShopmindAssistantContext,
     ShopmindAgentState,
     IntentResponse,
@@ -45,11 +45,13 @@ async def intent_decomposer_node(state: ShopmindAgentState, runtime: Runtime[Sho
     llm = context.llm
     max_clarification_count = context.max_clarification_count
     max_history_task_count = context.max_history_task_count
+    max_search_loop = context.max_search_loop
 
     # 1. 意图识别：购物、平台规则、闲聊，并提取槽位
     subtasks = state.get("sub_tasks", [])
     # 过滤：只发送最近的 N 个未完成的活跃子任务
     filtered_subtasks = _filter_active_subtasks(subtasks, max_count=max_history_task_count)
+    # 意图分析，传入重写后的 query
     intent_resp = await intent_analyze(llm, state.get("rewritten_query", ""), filtered_subtasks)
     logger.info(f"thread_id: {context.thread_id}, 意图识别结果：{intent_resp}")
 
@@ -64,16 +66,22 @@ async def intent_decomposer_node(state: ShopmindAgentState, runtime: Runtime[Sho
                 # 创建新的 ShoppingSubTask 并填充槽位
                 current_subtask = ShoppingSubTask(
                     category=IntentCategory.SHOPPING,
-                    original_query=intent_item.sub_query,
+                    sub_query=intent_item.sub_query,
                     status=TaskStatus.NEW,
                     product_category=intent_item.extracted_slots.get("product_category"),
                     keywords=intent_item.extracted_slots.get("keywords", []),
                     filters=intent_item.extracted_slots.get("filters", {}),
+                    is_replace_products=intent_item.is_replace_products,
+                    searched_pages=[0],
+                    max_search_loop=max_search_loop
                 )
                 subtasks.append(current_subtask)
             else:
                 # 更新已有的 SubTask 槽位
                 _update_subtask_slots(matched_subtask, intent_item.extracted_slots)
+                # 更新 is_replace_products
+                matched_subtask.is_replace_products = intent_item.is_replace_products
+                current_subtask = matched_subtask
             # 判断是否需要澄清
             _handle_clarification(current_subtask, intent_item, max_clarification_count)
 
@@ -82,7 +90,7 @@ async def intent_decomposer_node(state: ShopmindAgentState, runtime: Runtime[Sho
                 # 如果是平台规则，创建 PlatformSubTask
                 new_subtask = PlatformSubTask(
                     category=IntentCategory.PLATFORM,
-                    original_query=intent_item.sub_query,
+                    sub_query=intent_item.sub_query,
                     status=TaskStatus.NEW,
                 )
                 current_subtask = new_subtask
@@ -93,7 +101,7 @@ async def intent_decomposer_node(state: ShopmindAgentState, runtime: Runtime[Sho
                 # 创建 ChitchatSubTask
                 new_subtask = ChitchatSubTask(
                     category=IntentCategory.CHITCHAT,
-                    original_query=intent_item.sub_query,
+                    sub_query=intent_item.sub_query,
                     status=TaskStatus.NEW,
                 )
                 current_subtask = new_subtask
@@ -169,11 +177,10 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
             for task in shopping_tasks:
                 if isinstance(task, ShoppingSubTask):
                     history_context += f"- task_id: {task.task_id}\n"
-                    history_context += f"  original_query: {task.original_query}\n"
+                    history_context += f"  original_query: {task.sub_query}\n"
                     history_context += f"  product_category: {task.product_category}\n"
                     history_context += f"  keywords: {task.keywords}\n"
                     history_context += f"  filters: {task.filters}\n"
-                    history_context += f"  clarification_count: {task.clarification_count}\n"
                     history_context += f"  created_at: {task.created_at}\n\n"
 
     INTENT_ANALYSIS_PROMPT = """
@@ -237,11 +244,14 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
     - 必须输出合法的 JSON，符合提供的 Pydantic schema。
     - `intent_items` 列表不能为空。
     - `intent` 字段必须是枚举值之一：SHOPPING, PLATFORM, CHITCHAT。
-    - 对于 PLATFORM 和 CHITCHAT 类型，`is_new` 固定为 true，`matched_task_id` 为 null，`extracted_slots` 为空字典，`explicit_search` 固定为 false。
+    - 对于 PLATFORM 和 CHITCHAT 类型，`is_new` 固定为 true，`matched_task_id` 为 null，`extracted_slots` 为空字典，`explicit_search` 固定为 false，`is_replace_products` 固定为 false。
     - `extracted_slots` 字段必须包含：product_category, keywords, filters（SHOPPING 意图）。
     - `explicit_search` 字段表示用户是否明确表示要立即搜索商品：
-      - explicit_search=true：用户明确说"搜一下"、"就这个了"、"差不多就行"、"随便"
+      - explicit_search=true：用户说"搜一下"、"就这个了"、"差不多就行"、"随便、任意"
       - explicit_search=false：用户只是继续描述需求，如"推荐一款"、"要拍照好看的"、"有没有..."
+    - `is_replace_products` 字段表示用户是否要求"换一批"：
+      - is_replace_products=true：用户明确说"换一批"、"换一个"、"再看看其他的"
+      - is_replace_products=false：用户修改条件、补充需求、或首次推荐
     - **重要**：对于 is_new=false 的旧意图，keywords 必须返回完整的列表（历史 + 新增）
 
     # Few-Shot Examples
@@ -261,7 +271,8 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
             "keywords": [],
             "filters": {}
           },
-          "explicit_search": false
+          "explicit_search": false,
+          "is_replace_products": false
         },
         {
           "sub_query": "京东白条怎么开通",
@@ -269,7 +280,8 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
           "is_new": true,
           "matched_task_id": null,
           "extracted_slots": {},
-          "explicit_search": false
+          "explicit_search": false,
+          "is_replace_products": false
         }
       ]
     }
@@ -289,7 +301,8 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
             "keywords": ["索尼"],
             "filters": {}
           },
-          "explicit_search": true
+          "explicit_search": true,
+          "is_replace_products": false
         }
       ]
     }
@@ -316,7 +329,8 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
             "keywords": [],
             "filters": {"price_max": 3000}
           },
-          "explicit_search": false
+          "explicit_search": false,
+          "is_replace_products": false
         }
       ]
     }
@@ -343,7 +357,8 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
             "keywords": ["红色"],
             "filters": {}
           },
-          "explicit_search": false
+          "explicit_search": false,
+          "is_replace_products": false
         }
       ]
     }
@@ -370,7 +385,8 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
             "keywords": ["拍照好看"],
             "filters": {}
           },
-          "explicit_search": false
+          "explicit_search": false,
+          "is_replace_products": false
         }
       ]
     }
@@ -397,12 +413,13 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
             "keywords": ["续航久", "拍照好看", "黑色"],
             "filters": {}
           },
-          "explicit_search": false
+          "explicit_search": false,
+          "is_replace_products": false
         }
       ]
     }
 
-    ## 示例7：继续浏览 - 清空关键词
+    ## 示例7：换一批 - 继续浏览更多商品
     User: "再看看其他的。"
     Historical Shopping Subtasks:
     - task_id: task_001
@@ -424,7 +441,8 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
             "keywords": [],
             "filters": {}
           },
-          "explicit_search": false
+          "explicit_search": false,
+          "is_replace_products": true
         }
       ]
     }
@@ -448,7 +466,8 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
             "keywords": [],
             "filters": {}
           },
-          "explicit_search": false
+          "explicit_search": false,
+          "is_replace_products": false
         }
       ]
     }
@@ -463,7 +482,8 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
           "intent": "CHITCHAT",
           "is_new": true,
           "matched_task_id": null,
-          "extracted_slots": {}
+          "extracted_slots": {},
+          "is_replace_products": false
         }
       ]
     }
@@ -471,8 +491,6 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
     # Historical Shopping Subtasks
     {history_context}
 
-    # User Input
-    {user_query}
 
     你的输出格式应严格按照以下要求，不要包含任何额外解释或文本：
     {format_instructions}

@@ -7,11 +7,11 @@
 """
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.runtime import Runtime
-from app.agents.v3.schema import (
+from app.agents.v1.schema import (
     ShopmindAgentState,
     ShopmindAssistantContext,
 )
-from app.agents.v3.utils import build_history_context
+from app.agents.v1.utils import build_history_context
 from app.utils.logger import app_logger as logger
 
 
@@ -53,7 +53,7 @@ async def query_rewrite(
 
     # 核心任务
     1. **指代消除**: 将模糊的指代（如"这个"、"那个"、"东西"、"便宜的"、"换一个"）替换为具体的商品品类或属性
-    2. **信息补全**: 结合历史对话，补全用户未明确说明但隐含的商品信息
+    2. **信息补全**: 结合历史对话，补全用户未明确说明但隐含的信息
     3. **保持原样**: 如果没有问题需要重写（如首次提问），则保持原样
     4. **多个子问题**: 用户问题如果包含多个子问题，则每个子问题都要分别重写
 
