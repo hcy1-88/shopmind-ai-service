@@ -64,8 +64,9 @@ async def platform_node(state: PlatformNodeState, runtime: Runtime[ShopmindAssis
 要求：
 1. 如果知识库中有相关信息，请结合历史上下文给出清晰、完整的回答
 2. 如果知识库中没有找到相关信息，请礼貌地告知用户"抱歉，未找到相关的平台政策信息"
-3. 回答要简洁有条理，避免重复检索到的原文
-4. 如果用户的问题与历史上下文中的商品相关，请结合该商品信息回答
+3. 如果你认为上下文不能确定地解答用户的问题，可以请求用户补充更多的信息
+4. 回答要简洁有条理，避免重复检索到的原文
+5. 如果用户的问题与历史上下文中的商品相关，请结合该商品信息回答
 """
         response = await llm.ainvoke([HumanMessage(content=prompt)])
         final_response = response.content.strip()
