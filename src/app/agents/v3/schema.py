@@ -53,6 +53,7 @@ class SubTask(BaseModel):
     status: TaskStatus
     clarification_count: int = Field(default=0, description="已澄清次数，最多3次")
     created_at: datetime = Field(default_factory=datetime.now)
+    final_response: str | None = Field(default=None, description="最终响应内容，由各意图处理器填充")
 
 
 class ShoppingSubTask(SubTask):
