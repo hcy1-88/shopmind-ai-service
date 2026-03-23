@@ -81,4 +81,4 @@ async def platform_node(state: PlatformNodeState, runtime: Runtime[ShopmindAssis
         sub_task.status = TaskStatus.FAILED
         sub_task.final_response = f"处理平台规则查询时发生错误: {str(e)}"
 
-    return {"sub_task": sub_task}
+    return {"sub_task_results": [sub_task]}

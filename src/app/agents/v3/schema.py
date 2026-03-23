@@ -5,6 +5,7 @@
 @Time       : 2026/3/8 17:26
 @Author     : hcy18
 """
+import operator
 from datetime import datetime
 from enum import Enum
 from typing import TypedDict, Annotated
@@ -90,4 +91,5 @@ class ShopmindAgentState(TypedDict):
     rewritten_query: str | None
     sub_tasks: list[SubTask]
     current_tasks: list[SubTask]
-
+    # 聚合器收集任务结果
+    sub_task_results: Annotated[list[SubTask], operator.add]
