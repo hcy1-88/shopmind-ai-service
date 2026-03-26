@@ -8,7 +8,7 @@
 from typing import Optional
 
 from langchain.agents import create_agent
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import BaseMessage, HumanMessage
 
 from app.agents.v1.schema import ShopmindAssistantContext
 from app.agents.v1.utils import build_history_context
@@ -55,19 +55,8 @@ class ChitChatService:
         """初始化闲聊服务"""
         # 获取 LLM
         self.llm = llm_service.get_llm_service().get_chat_model()
+        self.agent = None
 
-        # 工具列表
-        tools = [tavily_search, get_current_weather, get_forecast_weather]
-        logger.info(f"[ChitChatService] 初始化中，工具数量: {len(tools)}")
-
-        # 创建 ReAct Agent
-        self.agent = create_agent(
-            self.llm,
-            tools=tools,
-            system_prompt=CHITCHAT_PROMPT
-        )
-
-        logger.info("[ChitChatService] 初始化完成")
 
     @classmethod
     def get_instance(cls) -> "ChitChatService":
@@ -98,15 +87,29 @@ class ChitChatService:
                 full_input = query
 
             # 调用 agent
-            result = await self.agent.ainvoke({"input": full_input})
-            output = result.get("output", "")
-
-            logger.info(f"[ChitChatService] 完成: {output[:50]}...")
-            return output
+            result = await self.agent.ainvoke({"messages": [HumanMessage(content=full_input)]})
+            resp = result["messages"][-1].content
+            logger.info(f"[ChitChatService] 完成: {resp[:50]}...")
+            return resp
 
         except Exception as e:
             logger.error(f"[ChitChatService] 失败: {e}", exc_info=True)
             return f"抱歉，处理您的问题时遇到了问题: {str(e)}"
+
+    def build_chitchat_agent(self, checkpointer):
+        # 工具列表
+        tools = [tavily_search, get_current_weather, get_forecast_weather]
+        logger.info(f"[ChitChatService] 初始化中，工具数量: {len(tools)}")
+
+        # 创建 ReAct Agent
+        self.agent = create_agent(
+            self.llm,
+            tools=tools,
+            system_prompt=CHITCHAT_PROMPT,
+            checkpointer=checkpointer,
+        )
+
+        logger.info("[ChitChatService] 初始化完成")
 
 
 def get_chitchat_service() -> ChitChatService:

@@ -5,11 +5,12 @@ from typing import AsyncGenerator, Optional
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from app.agents.v1.schema import ShopmindAssistantContext
-from app.agents.v1.shopmind_graph import ShopmindAgentGraph
+from app.agents.v1.graph_factory import GraphFactory
 from app.config.nacos_client import get_nacos_client
 from app.schemas.ai_ask_schema import AIAskRequest
 from app.services import llm_service
 from app.checkpoints import get_redis_checkpoint_saver
+from app.checkpoints.postgres_checkpoint import PostgresCheckpoint
 from app.utils.logger import app_logger as logger
 
 
@@ -29,18 +30,43 @@ class AIChatService:
     
     def __init__(self):
         """初始化 AI 对话服务"""
-        # Redis 短期记忆，ttl 个小时过期
+        # 获取聊天配置
         chat_config = get_nacos_client().get_chat_config()
-        ttl = chat_config.get("checkpoint_expire", 2)
-        self.checkpointer = get_redis_checkpoint_saver(ttl=ttl*3600)
+        checkpoint_provider = chat_config.get("checkpoint_provider", "redis")
+
+        # 根据配置初始化 checkpointer
+        if checkpoint_provider == "postgres":
+            # PostgreSQL checkpointer
+            postgres_config = chat_config.get("checkpointer", {}).get("postgres", {})
+            db_uri = self._build_postgres_uri(postgres_config)
+            postgres_checkpoint = PostgresCheckpoint()
+            self.checkpointer = postgres_checkpoint.get_checkpoint(db_uri)
+            logger.info(f"AIChatService 使用 PostgresCheckpoint，DB: {postgres_config.get('host')}:{postgres_config.get('port')}/{postgres_config.get('database')}")
+        else:
+            # Redis checkpointer（默认）
+            ttl = chat_config.get("checkpoint_expire", 2)
+            self.checkpointer = get_redis_checkpoint_saver(ttl=ttl*3600)
+            logger.info(f"AIChatService 使用 RedisCheckpoint，TTL: {ttl}小时")
+
+        # 提取其他配置
         self.max_clarification_count = chat_config.get("max_clarification_count", 3)
         self.max_history_task_count = chat_config.get("max_history_task_count", 3)
         self.max_search_loop = chat_config.get("max_search_loop", 3)
 
-        # 创建 agent（单例，所有请求复用）
-        self.graph = ShopmindAgentGraph.get_instance().get_graph()
-        
+        # 通过工厂统一初始化所有图（父图 + 所有子图）
+        self.graph = GraphFactory.build_all(self.checkpointer).get_graph()
+
         logger.info("AIChatService 初始化完成")
+
+    def _build_postgres_uri(self, postgres_config: dict) -> str:
+        """构建 PostgreSQL 连接 URI"""
+        host = postgres_config.get("host", "localhost")
+        port = postgres_config.get("port", 5432)
+        database = postgres_config.get("database", "shopmind")
+        user = postgres_config.get("user", "postgres")
+        password = postgres_config.get("password", "")
+        sslmode = postgres_config.get("sslmode", "disable")
+        return f"postgresql://{user}:{password}@{host}:{port}/{database}?sslmode={sslmode}"
     
     @classmethod
     def get_instance(cls) -> "AIChatService":

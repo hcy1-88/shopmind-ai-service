@@ -224,7 +224,31 @@ class NacosClient:
 
     
     def get_chat_config(self) -> dict[str, Any]:
-        """获取 chat 配置"""
+        """
+        获取 chat 配置，nacos 示例：
+        chat:
+          checkpoint_provider: postgres
+          checkpointer:
+            redis:
+              url: "redis://localhost:6379/2"
+              max_connections: 10
+              password: root
+              # 短期记忆过期时间，默认 2 小时
+              checkpoint_expire: 2
+            # DB_URI = "postgresql://postgres:postgres@localhost:5442/postgres?sslmode=disable"
+            postgres:
+              host: localhost
+              port: 15432
+              database: shopmind_rag
+              user: postgres
+              password: hcy991002
+          # 最大澄清轮次
+          max_clarification_count: 3
+          # 考虑的历史任务最大数量（历史任务与用户query 做匹配时要用）
+          max_history_task_count: 3
+          # 过滤节点到搜索节点的最大循环次数
+          max_search_loop: 3
+        """
         nacos_config = self.config_from_nacos
         NAME = "chat"
         if NAME in nacos_config:

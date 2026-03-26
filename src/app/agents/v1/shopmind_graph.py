@@ -5,7 +5,7 @@
 @Time       : 2026/3/26 17:49
 @Author     : hcy18
 """
-from typing import Optional, Any
+from typing import Optional, Any, TYPE_CHECKING
 
 from langgraph.constants import END, START
 from langgraph.graph import StateGraph
@@ -21,6 +21,10 @@ from app.agents.v1.nodes.aggregator_node import aggregate_node
 from app.agents.v1.edges.route_to_map_edge import route_to_map_node_edge
 from app.utils.logger import app_logger as logger
 
+if TYPE_CHECKING:
+    from app.agents.v1.subagents.shopping_agent import ShoppingSubgraph
+    from app.agents.v1.subagents.chitchat_agent import ChitChatService
+
 
 class ShopmindAgentGraph:
     """
@@ -30,9 +34,9 @@ class ShopmindAgentGraph:
         START -> query_rewrite_node -> intent_decomposer_node
                                               |
                               route_to_map_node_edge (Send)
-                                    /      |         \
+                                    /      |         \\
                     shopping_subgraph_node  platform_node  chitchat_node
-                                    \      |         /
+                                    \\      |         /
                                      sub_task_results (累积)
                                               |
                                         aggregator_node
@@ -51,12 +55,36 @@ class ShopmindAgentGraph:
         if hasattr(self, "_initialized"):
             return
         self._initialized = True
-        self.graph = self.__build_graph()
+        self._graph: CompiledStateGraph | None = None
+        self.shopping_subgraph: "ShoppingSubgraph | None" = None  # 持有子图引用
+        self.chitchat_agent: "ChitChatService | None" = None  # 持有 chitchat 引用
         logger.info("ShopmindAgentGraph 初始化成功!")
 
-    def __build_graph(self) -> CompiledStateGraph:
+    def init_graph(self, checkpointer, shopping_subgraph: "ShoppingSubgraph", chitchat_agent: "ChitChatService"):
+        """初始化主图，持有子图引用并构建主图
+
+        Args:
+            checkpointer: checkpointer 实例
+            shopping_subgraph: Shopping 子图实例
+            chitchat_agent: ChitChatService 实例
+        """
+        self.shopping_subgraph = shopping_subgraph
+        self.chitchat_agent = chitchat_agent
+        self._graph = self._build_graph(checkpointer)
+
+    def get_graph(self) -> CompiledStateGraph:
+        """获取编译后的图
+
+        Returns:
+            编译后的图
+        """
+        if self._graph is None:
+            raise RuntimeError("Graph not initialized. Call init_graph() first.")
+        return self._graph
+
+    def _build_graph(self, checkpointer) -> CompiledStateGraph:
         """构建主图"""
-        # 创建 StateGraph
+        # 构建父图
         main_graph = StateGraph(ShopmindAgentState)
 
         # 添加节点
@@ -87,11 +115,11 @@ class ShopmindAgentGraph:
         main_graph.add_edge("aggregator_node", END)
 
         # 编译
-        compiled = main_graph.compile()
+        compiled = main_graph.compile(checkpointer=checkpointer)
 
         # 打印 mermaid 图结构
         mermaid_graph = compiled.get_graph().draw_mermaid()
-        logger.info(f"ShopmindAgentGraph mermaid: {mermaid_graph}")
+        logger.info(f"[主Agent]-ShopmindAgentGraph mermaid: {mermaid_graph}")
 
         return compiled
 
@@ -101,7 +129,3 @@ class ShopmindAgentGraph:
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
-
-    def get_graph(self) -> CompiledStateGraph:
-        """获取编译后的图"""
-        return self.graph

@@ -6,6 +6,8 @@
 @Author     : hcy18
 """
 from typing import Optional, Any
+
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.constants import END, START
 from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -51,11 +53,11 @@ class ShoppingSubgraph:
         return cls._instance
 
     def __init__(self):
+        self.graph = None
         if hasattr(self, "_initialized"):
             return
         self._initialized = True
-        self.graph = self.__build_subgraph()
-        logger.info("shopping 导购子图初始化成功！")
+
 
     @classmethod
     def get_instance(cls) -> "ShoppingSubgraph":
@@ -65,7 +67,7 @@ class ShoppingSubgraph:
         return cls._instance
 
 
-    def __build_subgraph(self):
+    def _build_subgraph(self, checkpointer):
         # 图构建
         shopping_subgraph = StateGraph(ShoppingSubgraphState)
 
@@ -101,8 +103,8 @@ class ShoppingSubgraph:
 
         shopping_subgraph.add_edge("generate_node", END)
 
-        # 编译 todo 需要加入 checkpointer 记忆
-        shopping_subgraph = shopping_subgraph.compile()
+        # 编译
+        shopping_subgraph = shopping_subgraph.compile(checkpointer=checkpointer)
 
         # mermaid 可视化
         shopping_subgraph_mermaid = shopping_subgraph.get_graph().draw_mermaid()
@@ -111,6 +113,12 @@ class ShoppingSubgraph:
         return shopping_subgraph
 
 
-    def get_graph(self) -> CompiledStateGraph[Any, Any, Any, Any]:
+    def build_shopping_subgraph(self, checkpointer):
         """获取编译后的子图"""
+        if not self.graph:
+            self.graph = self._build_subgraph(checkpointer=checkpointer)
+            logger.info("shopping 导购子图初始化成功！")
+
+
+    def get_graph(self):
         return self.graph
