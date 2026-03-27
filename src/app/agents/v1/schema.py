@@ -43,7 +43,7 @@ class IntentItem(BaseModel):
     matched_task_id: str | None = None
     extracted_slots: dict = Field(default_factory=dict, description="从用户输入提取的槽位信息")
     explicit_search: bool = Field(default=False, description="用户是否明确表示要立即搜索（如'搜一下'、'就这个了'）")
-    is_replace_products: bool = Field(default=False, description="用户是否要求'换一批'（如'换一批'、'换一个'），为 true 时 filter_node 排除 has_searched_product_ids")
+    is_replace_products: bool = Field(default=False, description="用户是否要求'换一批'（如'换一批'、'换一个'），为 true 时 filter_node 排除 has_recommended_product_ids")
 
 
 class IntentResponse(BaseModel):
@@ -66,7 +66,7 @@ class ShoppingSubTask(SubTask):
     product_category: str | None = Field(default=None, description="商品品类（核心词），如手机、耳机")
     keywords: list[str] = Field(default_factory=list, description="搜索关键词（扩展词）")
     filters: dict = Field(default_factory=dict, description="过滤条件，如价格区间、颜色等")
-    has_searched_product_id: list[int] = Field(default_factory=list, description="已经搜索过的商品，用户要求换一批时有用")
+    has_recommended_product_ids: list[int] = Field(default_factory=list, description="已经搜索过的商品，用户要求换一批时有用")
     # 已经使用过的搜索页号
     searched_pages: list[int]
     is_replace_products: bool = Field(default=False, description="是否为换一批场景，为 true 时 filter_node 排除已推荐商品")

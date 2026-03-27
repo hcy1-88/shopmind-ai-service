@@ -38,7 +38,7 @@ async def ready_node(state: ShoppingSubgraphState, context: ShopmindAssistantCon
         ## 当不需要调用工具时，请返回推荐文案。
         """
 
-        # 构建 user prompt: product_category + keywords（不包含 filters 或 has_searched_product_ids）
+        # 构建 user prompt: product_category + keywords（不包含 filters 或 has_recommended_product_ids）
         user_prompt = f"商品品类: {task.product_category or '未指定'}"
         if task.keywords:
             user_prompt += f"\n关键词: {', '.join(task.keywords)}"

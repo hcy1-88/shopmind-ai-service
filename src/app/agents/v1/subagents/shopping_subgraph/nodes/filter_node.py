@@ -30,17 +30,17 @@ async def filter_node(state: ShoppingSubgraphState, context: ShopmindAssistantCo
     product_details_text = "\n\n".join(product_details_list)
 
     filters = task.filters or {}
-    has_searched = task.has_searched_product_ids or []
+    has_searched = task.has_recommended_product_ids or []
     is_replace = task.is_replace_products
 
     parser = PydanticOutputParser(pydantic_object=FilterResult)
     format_instructions = parser.get_format_instructions()
 
-    # 构建 prompt：是否排除 has_searched_product_ids 取决于 is_replace_products
+    # 构建 prompt：是否排除 has_recommended_product_ids 取决于 is_replace_products
     if is_replace:
-        exclude_note = "注意：必须排除 has_searched_product_ids 中的商品 ID，这些商品已展示过。"
+        exclude_note = "注意：必须排除 has_recommended_product_ids 中的商品 ID，这些商品已展示过。"
     else:
-        exclude_note = "注意：不要排除 has_searched_product_ids 中的商品，即使它们之前展示过。"
+        exclude_note = "注意：不要排除 has_recommended_product_ids 中的商品，即使它们之前展示过。"
 
     system_prompt = f"""你是一个电商导购助手，负责从搜索结果中筛选出最符合用户需求的商品。
 
@@ -62,7 +62,7 @@ async def filter_node(state: ShoppingSubgraphState, context: ShopmindAssistantCo
 ## 用户的过滤条件
 {filters}
 
-## has_searched_product_ids：已经展示过的商品 ID（{'需排除' if is_replace else '无需排除'})
+## has_recommended_product_ids：已经展示过的商品 ID（{'需排除' if is_replace else '无需排除'})
 {has_searched}
 
 请根据以上信息，筛选出需要保留的商品 ID，返回 JSON 格式。"""
@@ -85,9 +85,9 @@ async def filter_node(state: ShoppingSubgraphState, context: ShopmindAssistantCo
         if dto.product_id in result.filtered_product_ids
     ]
 
-    # 更新 has_searched_product_ids
-    existing = set(task.has_searched_product_ids)
-    task.has_searched_product_ids = list(existing | set(task.filtered_product_ids))
+    # 更新 has_recommended_product_ids
+    existing = set(task.has_recommended_product_ids)
+    task.has_recommended_product_ids = list(existing | set(task.filtered_product_ids))
 
     # 更新状态
     return {
