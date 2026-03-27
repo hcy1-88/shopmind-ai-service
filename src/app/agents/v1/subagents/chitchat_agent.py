@@ -9,6 +9,7 @@ from typing import Optional
 
 from langchain.agents import create_agent
 from langchain_core.messages import BaseMessage, HumanMessage
+from langgraph.types import RunnableConfig
 
 from app.agents.v1.schema import ShopmindAssistantContext
 from app.agents.v1.utils import build_history_context
@@ -65,13 +66,14 @@ class ChitChatService:
             cls._instance = cls()
         return cls._instance
 
-    async def chat(self, query: str, messages: list[BaseMessage]) -> str:
+    async def chat(self, query: str, messages: list[BaseMessage], thread_id: str) -> str:
         """
         处理闲聊查询
 
         Args:
             query: 用户查询
             messages: 对话历史
+            thread_id: 用于 checkpoint 的线程 ID
 
         Returns:
             Agent 生成的回答
@@ -86,8 +88,9 @@ class ChitChatService:
             else:
                 full_input = query
 
-            # 调用 agent
-            result = await self.agent.ainvoke({"messages": [HumanMessage(content=full_input)]})
+            # 调用 agent，传入 thread_id 以支持 checkpoint
+            config = RunnableConfig(configurable={"thread_id": thread_id})
+            result = await self.agent.ainvoke({"messages": [HumanMessage(content=full_input)]}, config=config)
             resp = result["messages"][-1].content
             logger.info(f"[ChitChatService] 完成: {resp[:50]}...")
             return resp

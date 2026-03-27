@@ -37,17 +37,19 @@ async def ready_node(state: ShoppingSubgraphState, context: ShopmindAssistantCon
 
         ## 当不需要调用工具时，请返回推荐文案。
         """
-
-        # 构建 user prompt: product_category + keywords（不包含 filters 或 has_recommended_product_ids）
-        user_prompt = f"商品品类: {task.product_category or '未指定'}"
-        if task.keywords:
-            user_prompt += f"\n关键词: {', '.join(task.keywords)}"
-        # 换一批，则需要指定页号
-        if task.is_replace_products:
-            user_prompt += f"搜索商品的起始页号是第 {max(task.searched_pages) + 1} 页！"
-
         subgraph_messages.append(SystemMessage(content=sys_prompt))
-        subgraph_messages.append(HumanMessage(content=user_prompt))
+
+    # 构建 user prompt: product_category + keywords（不包含 filters 或 has_recommended_product_ids）
+    user_prompt = f"商品品类: {task.product_category or '未指定'}"
+    if task.keywords:
+        user_prompt += f"\n关键词: {', '.join(task.keywords)}"
+
+    if task.is_replace_products:
+        # 换一批场景：从 filter_node 返回，需要追加用户消息指定页号
+        next_page = max(task.searched_pages) + 1 if task.searched_pages else 1
+        user_prompt += f"\n搜索商品的起始页号是第 {next_page} 页！"
+
+    subgraph_messages.append(HumanMessage(content=user_prompt))
 
     # 绑定工具并调用 LLM
     llm_with_tools = llm.bind_tools([search_product, get_product_detail])
