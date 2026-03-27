@@ -3,12 +3,12 @@
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.language_models import BaseChatModel
 
-from app.agents.v1.schema import ShoppingSubTask, ShoppingSubgraphState, ShopmindAssistantContext
+from app.agents.v1.schema import ShoppingSubTask, SearchingSubgraphState, ShopmindAssistantContext
 from app.agents.v1.utils import build_history_context
 from app.utils.logger import app_logger as logger
 
 
-async def clarifying_node(state: ShoppingSubgraphState, context: ShopmindAssistantContext):
+async def clarifying_node(state: SearchingSubgraphState, context: ShopmindAssistantContext):
     """对当前购买商品进行澄清询问，生成问题"""
     task: ShoppingSubTask = state["task"]
     messages: list[BaseMessage] = state.get("messages", [])

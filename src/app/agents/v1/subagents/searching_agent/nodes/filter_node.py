@@ -4,12 +4,12 @@ from langchain_core.messages import BaseMessage
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
-from app.agents.v1.schema import ShoppingSubTask, ShoppingSubgraphState, ShopmindAssistantContext, FilterResult
+from app.agents.v1.schema import ShoppingSubTask, SearchingSubgraphState, ShopmindAssistantContext, FilterResult
 from app.schemas.product_response_schema import ProductResponseDto
 from app.utils.logger import app_logger as logger
 
 
-async def filter_node(state: ShoppingSubgraphState, context: ShopmindAssistantContext):
+async def filter_node(state: SearchingSubgraphState, context: ShopmindAssistantContext):
     """对工具搜索结果进行 LLM 语义过滤，并更新 has_searched_product_id"""
     task: ShoppingSubTask = state["task"]
     searched_details: list[ProductResponseDto] = state.get("searched_details", [])

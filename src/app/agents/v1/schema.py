@@ -25,6 +25,7 @@ class IntentCategory(str, Enum):
     SHOPPING = "SHOPPING"
     PLATFORM = "PLATFORM"
     CHITCHAT = "CHITCHAT"
+    COMPARISON = "COMPARISON"
 
 
 class TaskStatus(str, Enum):
@@ -56,7 +57,6 @@ class SubTask(BaseModel):
     category: IntentCategory = Field(default=None, description="意图识别的分类")
     sub_query: str = Field(description="重写后的子问题")
     status: TaskStatus
-    clarification_count: int = Field(default=0, description="已澄清次数，最多3次")
     created_at: datetime = Field(default_factory=datetime.now)
     final_response: str | None = Field(default=None, description="最终响应内容，由各意图处理器填充")
 
@@ -66,9 +66,10 @@ class ShoppingSubTask(SubTask):
     product_category: str | None = Field(default=None, description="商品品类（核心词，表示最小售卖单位），如手机、耳机，核心词只能是一个")
     keywords: list[str] = Field(default_factory=list, description="搜索关键词（扩展词）")
     filters: dict = Field(default_factory=dict, description="过滤条件，如价格区间、颜色等")
+    clarification_count: int = Field(default=0, description="已澄清次数，最多3次")
     has_recommended_product_ids: list[int] = Field(default_factory=list, description="已经搜索过的商品，用户要求换一批时有用")
     # 已经使用过的搜索页号
-    searched_pages: list[int]
+    searched_pages: list[int] = Field(default=[0], description="此搜索任务已经搜索过的页号")
     is_replace_products: bool = Field(default=False, description="是否为换一批场景，为 true 时 filter_node 排除已推荐商品")
     # 一次对话内，调用搜索工具的最大循环次数（filter_node -> ready_node）
     max_search_loop: int
@@ -82,6 +83,12 @@ class PlatformSubTask(SubTask):
 class ChitchatSubTask(SubTask):
     """闲聊意图的 SubTask"""
     pass
+
+
+class ComparisonSubTask(SubTask):
+    """商品比较意图的 SubTask"""
+    # 待比较的商品ID列表（从关联的 ShoppingSubTask.has_recommended_product_ids 获取）
+    product_ids: list[int] = Field(default_factory=list, description="待比较的商品ID列表")
 
 
 class ShopmindAssistantContext(BaseModel):
@@ -127,8 +134,13 @@ class ShoppingNodeState(BaseModel):
     messages: Annotated[list[BaseMessage], add_messages]
 
 
-## ======================= 导购任务子图状态 =================
-class ShoppingSubgraphState(TypedDict):
+class ComparisonNodeState(BaseModel):
+    sub_task: ShoppingSubTask
+    messages: Annotated[list[BaseMessage], add_messages]
+
+
+## ======================= 搜索商品的子图状态 =================
+class SearchingSubgraphState(TypedDict):
     # 导购任务
     task: ShoppingSubTask
     # 子图消息
@@ -153,3 +165,11 @@ class ShoppingSubgraphState(TypedDict):
 class FilterResult(BaseModel):
     """filter_node 输出解析器使用的 Pydantic 模型"""
     filtered_product_ids: list[int] = Field(description="过滤后需要保留的商品 ID 列表")
+
+
+## ======================= 比较商品的子图（基于商品id） ================
+class ComparisonSubgraphState(TypedDict):
+    task: ComparisonSubTask
+    product_ids: list[int]
+    product_details: Annotated[list[ProductResponseDto], operator.add]
+    subgraph_messages: Annotated[list[BaseMessage], add_messages]

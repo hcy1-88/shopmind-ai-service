@@ -5,25 +5,26 @@
 ShopMind Agent 采用 **LangGraph** 构建的**状态机编排**架构，主图（父图）负责顶层流程编排，子图（Subgraph）负责特定领域的任务执行。
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         ShopmindAgentGraph (主图)                      │
-│                                                                      │
-│  START ──► query_rewrite ──► intent_decomposer                       │
-│                                          │                           │
-│                              route_to_map_node_edge                  │
-│                                 (Send 并行分发)                      │
-│                              ┌──────┴──────┬───────────┐             │
-│                              ▼             ▼           ▼             │
-│                    shopping_subgraph   platform    chitchat          │
-│                         (子图)         _node       _node            │
-│                              │             │           │             │
-│                              └─────────────┴───────────┘             │
-│                                      │                               │
-│                                 aggregator                            │
-│                                   _node                              │
-│                                      │                               │
-│                                     END                              │
-└─────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────┐
+│                         ShopmindAgentGraph (主图)                        │
+│                                                                            │
+│  START ──► query_rewrite ──► intent_decomposer                            │
+│                                          │                                │
+│                              route_to_map_node_edge                       │
+│                                 (Send 并行分发)                           │
+│                              ┌──────┴──────┬───────────┬───────────┐   │
+│                              ▼             ▼           ▼            ▼   │
+│                    searching_      platform    chitchat    comparison_    │
+│                    subgraph_node   _node       _node     subgraph_node  │
+│                         (子图)                  (子图)                    │
+│                              │             │           │              │
+│                              └─────────────┴───────────┴──────────────┘  │
+│                                      │                                   │
+│                                 aggregator                               │
+│                                   _node                                 │
+│                                      │                                   │
+│                                     END                                 │
+└───────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 1.1 设计原则
@@ -43,9 +44,10 @@ ShopMind Agent 采用 **LangGraph** 构建的**状态机编排**架构，主图�
 |---------|---------|
 | `query_rewrite_node` | 对用户原始 query 进行改写，增强表达能力 |
 | `intent_decomposer_node` | 意图分解，将改写后的 query 拆分为多个子任务 |
-| `shopping_subgraph_node` | 调用购物子图，处理 SHOPPING 意图 |
+| `searching_subgraph_node` | 调用搜索子图，处理 SHOPPING 意图 |
 | `platform_node` | 处理 PLATFORM 意图（平台规则/政策查询） |
 | `chitchat_node` | 处理 CHITCHAT 意图（闲聊、天气等） |
+| `comparison_subgraph_node` | 调用比较子图，处理 COMPARISON 意图（商品比较） |
 | `aggregator_node` | 聚合所有子任务的执行结果，生成最终回复 |
 
 ### 2.2 边 (Edges)
@@ -61,15 +63,18 @@ intent_decomposer_node
   │
   ▼ [conditional_edges: route_to_map_node_edge]
   │
-  ├───── Send("shopping_subgraph_node") ───▶ shopping_subgraph_node
-  ├───── Send("platform_node") ────────────▶ platform_node
-  └───── Send("chitchat_node") ───────────▶ chitchat_node
+  ├───── Send("searching_subgraph_node") ───▶ searching_subgraph_node
+  ├───── Send("platform_node") ──────────────▶ platform_node
+  ├───── Send("chitchat_node") ─────────────▶ chitchat_node
+  └───── Send("comparison_subgraph_node") ───▶ comparison_subgraph_node
 
-shopping_subgraph_node ──┐
-                        │
-platform_node ──────────┼──▶ aggregator_node ──▶ END
-                        │
-chitchat_node ──────────┘
+searching_subgraph_node ───┐
+                           │
+platform_node ─────────────┼──▶ aggregator_node ──▶ END
+                           │
+chitchat_node ─────────────┤
+                           │
+comparison_subgraph_node ──┘
 ```
 
 ### 2.3 条件路由 (route_to_map_node_edge)
@@ -78,9 +83,11 @@ chitchat_node ──────────┘
 
 ```python
 if task.category == IntentCategory.SHOPPING:
-    → shopping_subgraph_node
+    → searching_subgraph_node
 elif task.category == IntentCategory.PLATFORM:
     → platform_node
+elif task.category == IntentCategory.COMPARISON:
+    → comparison_subgraph_node
 else:
     → chitchat_node
 ```
@@ -207,7 +214,8 @@ else:
 |-----|------|
 | `SHOPPING` | 购物意图（商品搜索、推荐） |
 | `PLATFORM` | 平台规则意图（政策、规则查询） |
-| `CHITCHAT` | 闲聊意图（天气、闲聊等） |
+| `CHITCHAT` | 闲聊意图（天气、闲聊、泛泛的品牌讨论等） |
+| `COMPARISON` | 商品比较意图（代词指代已推荐商品的比较） |
 
 ### 5.4 任务状态 (TaskStatus)
 
@@ -221,18 +229,66 @@ else:
 
 ---
 
-## 6. 初始化流程 (GraphFactory)
+## 6. 商品比较子图设计 (ComparisonSubgraph)
+
+当用户使用代词（"这几个"、"那些"）指代已推荐的商品时，触发比较子图。
+
+### 6.1 节点 (Nodes)
+
+| 节点名称 | 功能说明 |
+|---------|---------|
+| `detail_node` | 从 `has_recommended_product_ids` 获取商品ID，并行调用 `get_product_detail` 获取详情 |
+| `compare_node` | 将商品详情传给 LLM 生成对比文案和购买建议 |
+
+### 6.2 流程
+
+```
+START
+  │
+  ▼
+detail_node (获取商品详情)
+  │
+  ▼
+compare_node (生成对比文案)
+  │
+  ▼
+  END
+```
+
+### 6.3 触发条件
+
+当用户 query 满足以下条件时，路由到 COMPARISON 意图：
+
+1. 包含比较类词汇（"比较"、"区别"、"选哪个"）
+2. 使用了代词（"这几个"、"那些"、"那个"）
+3. 历史的 ShoppingSubTask 中 `has_recommended_product_ids` 非空
+
+### 6.4 路由规则
+
+| 用户输入 | 代词 | has_recommended_product_ids | 路由 |
+|---------|------|---------------------------|------|
+| "华为和iPhone选哪个" | 无 | 可能非空 | CHITCHAT（品牌讨论） |
+| "休闲裤还是工装裤" | 无 | 空 | CHITCHAT（泛泛讨论） |
+| "这几个有什么区别" | 有 | 非空 | COMPARISON（商品级比较） |
+| "那几个呢" | 有 | 空 | CHITCHAT（无锚点） |
+
+---
+
+## 7. 初始化流程 (GraphFactory)
 
 ```
 GraphFactory.build_all()
     │
-    ├─ 1. ShoppingSubgraph.build_shopping_subgraph()
-    │       └─ ShoppingSubgraph.get_instance()
+    ├─ 1. SearchingSubgraph.build_searching_subgraph()
+    │       └─ SearchingSubgraph.get_instance()
     │
     ├─ 2. ChitChatService.build_chitchat_agent()
     │       └─ ChitChatService.get_instance()
     │
-    └─ 3. ShopmindAgentGraph.init_graph()
+    ├─ 3. ComparisonSubgraph.build_comparison_subgraph()
+    │       └─ ComparisonSubgraph.get_instance()
+    │
+    └─ 4. ShopmindAgentGraph.init_graph()
             └─ ShopmindAgentGraph.get_instance()
 ```
 
@@ -240,7 +296,7 @@ GraphFactory.build_all()
 
 ---
 
-## 7. 技术栈
+## 8. 技术栈
 
 | 组件 | 技术 |
 |-----|------|
@@ -252,7 +308,7 @@ GraphFactory.build_all()
 
 ---
 
-## 8. 设计亮点
+## 9. 设计亮点
 
 1. **MapReduce 模式**：主图通过 `Send` 实现多任务并行处理
 2. **状态机驱动**：购物子图通过 `TaskStatus` 控制搜索-澄清-过滤流程

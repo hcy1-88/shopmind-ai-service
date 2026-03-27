@@ -3,10 +3,10 @@ from typing import Literal
 
 from langchain_core.messages import BaseMessage
 
-from app.agents.v1.schema import ShoppingSubgraphState
+from app.agents.v1.schema import SearchingSubgraphState
 
 
-def route_after_ready(state: ShoppingSubgraphState) -> Literal["filter_node", "tool_node"]:
+def route_after_ready(state: SearchingSubgraphState) -> Literal["filter_node", "tool_node"]:
     """根据 ready_node 输出的 AI message 是否有 tool_calls 决定路由"""
     subgraph_messages: list[BaseMessage] = state.get("subgraph_messages", [])
     if not subgraph_messages:

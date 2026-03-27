@@ -32,7 +32,7 @@
 
 ##### 核心能力
 
-- **多意图识别与多任务并行**：支持将用户复杂query拆分为多个独立子任务（SHOPPING、PLATFORM、CHITCHAT），并行执行后聚合结果
+- **多意图识别与多任务并行**：支持将用户复杂query拆分为多个独立子任务（SHOPPING、PLATFORM、CHITCHAT、COMPARISON），并行执行后聚合结果
 - **多轮澄清**：槽位不足时主动向用户提问澄清（最多3轮），支持品类、关键词、过滤条件等槽位提取
 - **商品过滤**：基于LLM语义理解对搜索结果进行智能过滤，排除不符合条件的商品
 - **换一批**：支持用户浏览更多商品，自动翻页搜索并排除已展示商品
@@ -74,17 +74,17 @@ START
 query_rewrite_node  (重写用户query)
   │
   ▼
-intent_decomposer_node  (意图分解：SHOPPING / PLATFORM / CHITCHAT)
+intent_decomposer_node  (意图分解：SHOPPING / PLATFORM / CHITCHAT / COMPARISON)
   │
   ▼
 route_to_map_node_edge  (条件路由，并行分发)
   │
-      ┌─────────────┬──────────────┐
-      ▼             ▼              ▼
-shopping_     platform_      chitchat_
-subgraph_node  node          node
-  │             │              │
-  └─────────────┴──────────────┘
+      ┌─────────────┬──────────────┬──────────────┐
+      ▼             ▼              ▼              ▼
+shopping_     platform_      chitchat_     comparison_
+subgraph_node  node          node         subgraph_node
+  │             │              │              │
+  └─────────────┴──────────────┴──────────────┘
               │
               ▼
         aggregator_node  (聚合各子任务结果)
@@ -125,15 +125,42 @@ node       (槽位齐全)
   └─────────┘
 ```
 
+### 商品比较子图结构（ComparisonSubgraph）
+
+当用户使用代词（"这几个"、"那些"）指代已推荐的商品时，触发比较子图：
+
+```
+START
+  │
+  ▼
+detail_node  (获取商品详情)
+  │
+  ▼
+compare_node  (LLM生成对比文案和购买建议)
+  │
+  ▼
+  END
+```
+
+**触发条件**：
+- 用户说了比较类词汇（"比较"、"区别"、"选哪个"）
+- 用户使用了代词（"这几个"、"那些"）
+- 历史的 ShoppingSubTask 中 `has_recommended_product_ids` 非空
+
+**路由规则**：
+- 有代词 + 有推荐商品 → COMPARISON → comparison_subgraph（商品级比较）
+- 无代词或无推荐商品 → CHITCHAT（品牌级讨论/泛泛而谈）
+
 ### 核心组件
 
 | 组件 | 职责 |
 |------|------|
 | `query_rewrite_node` | 重写用户query，结合历史上下文优化表达 |
 | `intent_decomposer_node` | 意图分解、槽位提取、判断新旧意图 |
-| `shopping_subgraph_node` | 购物意图处理，内含完整的状态机子图 |
+| `searching_subgraph_node` | 购物意图处理，内含完整的状态机子图 |
 | `platform_node` | 平台规则/政策问答 |
 | `chitchat_node` | 闲聊问答 |
+| `comparison_subgraph_node` | 商品比较处理，调用商品详情工具生成对比文案 |
 | `aggregator_node` | 聚合多任务结果，生成最终回复 |
 
 ### 导购子图节点
@@ -147,12 +174,20 @@ node       (槽位齐全)
 | `filter_node` | LLM语义过滤，排除不符合条件的商品 |
 | `generate_node` | 生成最终商品推荐文案 |
 
+### 比较子图节点
+
+| 节点 | 职责 |
+|------|------|
+| `detail_node` | 从 `has_recommended_product_ids` 获取商品ID，并行调用 `get_product_detail` 获取详情 |
+| `compare_node` | 将商品详情传给 LLM 生成对比文案和购买建议 |
+
 ### 关键设计
 
 1. **父子图状态共享**：通过 LangGraph 的 `operator.add` 注解实现 `messages`、`sub_task_results` 在父子图间自动合并
 2. **换一批实现**：通过 `is_replace_products` 标记控制 `filter_node` 排除已推荐商品，`ready_node` 自动翻页搜索
 3. **最大搜索循环**：通过 `max_search_loop` 控制分页上限，避免无限翻页
 4. **澄清次数限制**：通过 `clarification_count` 控制澄清轮次上限（默认3轮）
+5. **商品比较路由**：通过 `has_recommended_product_ids` 判断是否为已推荐商品的比较，有则走 COMPARISON 子图
 
 ## ⚙️ 安装和配置
 

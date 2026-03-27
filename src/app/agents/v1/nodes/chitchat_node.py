@@ -34,7 +34,7 @@ async def chitchat_node(state: ChitChatNodeState, runtime: Runtime[ShopmindAssis
         chitchat_service = get_chitchat_service()
 
         # 调用 agent 处理闲聊，使用 task_id 作为 thread_id 支持 checkpoint
-        final_response = await chitchat_service.chat(query, messages, sub_task.task_id)
+        final_response = await chitchat_service.chat(query, messages, f"chitchat_{sub_task.task_id}")
 
         # 更新 sub_task
         sub_task.final_response = final_response

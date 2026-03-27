@@ -3,12 +3,12 @@
 from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage
 from langchain_core.language_models import BaseChatModel
 
-from app.agents.v1.schema import ShoppingSubgraphState, ShopmindAssistantContext
+from app.agents.v1.schema import SearchingSubgraphState, ShopmindAssistantContext
 from app.tools.chat_tool import search_product, get_product_detail
 from app.utils.logger import app_logger as logger
 
 
-async def ready_node(state: ShoppingSubgraphState, context: ShopmindAssistantContext):
+async def ready_node(state: SearchingSubgraphState, context: ShopmindAssistantContext):
     """槽位齐全，根据商品信息调用 LLM 生成 tool call 或最终回复"""
     task = state["task"]
     subgraph_messages: list[BaseMessage] = state.get("subgraph_messages", [])

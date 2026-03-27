@@ -21,9 +21,11 @@ async def route_to_map_node_edge(state: ShopmindAgentState, context: ShopmindAss
     send_list = []
     for task in current_tasks:
         if task.category == IntentCategory.SHOPPING:
-            send_list.append(Send("shopping_subgraph_node", {"sub_task": task, "messages": state["messages"]}))
+            send_list.append(Send("searching_subgraph_node", {"sub_task": task, "messages": state["messages"]}))
         elif task.category == IntentCategory.PLATFORM:
             send_list.append(Send("platform_node", {"sub_task": task, "messages": state["messages"]}))
+        elif task.category == IntentCategory.COMPARISON:
+            send_list.append(Send("comparison_subgraph_node", {"sub_task": task, "messages": state["messages"]}))
         else:
             send_list.append(Send("chitchat_node", {"sub_task": task, "messages": state["messages"]}))
     return send_list

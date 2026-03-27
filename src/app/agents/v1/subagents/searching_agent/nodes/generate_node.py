@@ -2,12 +2,12 @@
 
 from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage, AIMessage
 
-from app.agents.v1.schema import ShoppingSubgraphState, ShopmindAssistantContext
+from app.agents.v1.schema import SearchingSubgraphState, ShopmindAssistantContext
 from app.schemas.product_response_schema import ProductResponseDto
 from app.utils.logger import app_logger as logger
 
 
-async def generate_node(state: ShoppingSubgraphState, context: ShopmindAssistantContext):
+async def generate_node(state: SearchingSubgraphState, context: ShopmindAssistantContext):
     """基于过滤后的商品生成最终推荐文案"""
     task = state["task"]
     subgraph_messages: list[BaseMessage] = state.get("subgraph_messages", [])

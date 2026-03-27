@@ -1,5 +1,5 @@
 """
-@File       : shopping_agent.py
+@File       : searching_agent.py
 @Description:
 
 @Time       : 2026/3/23 17:12
@@ -11,28 +11,28 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.constants import END, START
 from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
-from app.agents.v1.schema import ShoppingSubgraphState
-from app.agents.v1.subagents.shopping_subgraph.nodes import (
+from app.agents.v1.schema import SearchingSubgraphState
+from app.agents.v1.subagents.searching_agent.nodes import (
     dispatcher_node,
     clarifying_node,
     ready_node,
     filter_node,
     generate_node,
 )
-from app.agents.v1.subagents.shopping_subgraph.edges import (
+from app.agents.v1.subagents.searching_agent.edges import (
     route_by_status_edge,
     route_after_ready,
     router_after_filter,
 )
-from app.agents.v1.subagents.shopping_subgraph.nodes.tools import tool_node
+from app.agents.v1.subagents.searching_agent.nodes.tools import tool_node
 from app.utils.logger import app_logger as logger
 
 
-class ShoppingSubgraph:
+class SearchingSubgraph:
     """
     处理 shopping 意图的子图.
 
-    shopping_subgraph_node:
+    searching_subgraph_node:
       │
       ├─── if status == CLARIFYING:
       │       └── 生成澄清问题，返回给用户
@@ -45,7 +45,7 @@ class ShoppingSubgraph:
                       └── generate（生成商品推荐文案）
     """
 
-    _instance: Optional["ShoppingSubgraph"] = None
+    _instance: Optional["SearchingSubgraph"] = None
 
     def __new__(cls):
         if cls._instance is None:
@@ -60,7 +60,7 @@ class ShoppingSubgraph:
 
 
     @classmethod
-    def get_instance(cls) -> "ShoppingSubgraph":
+    def get_instance(cls) -> "SearchingSubgraph":
         """获取单例实例"""
         if cls._instance is None:
             cls._instance = cls()
@@ -69,7 +69,7 @@ class ShoppingSubgraph:
 
     def _build_subgraph(self, checkpointer):
         # 图构建
-        shopping_subgraph = StateGraph(ShoppingSubgraphState)
+        shopping_subgraph = StateGraph(SearchingSubgraphState)
 
         # 添加节点
         shopping_subgraph.add_node("dispatcher_node", dispatcher_node)

@@ -17,6 +17,7 @@ from app.agents.v1.schema import (
     ShoppingSubTask,
     PlatformSubTask,
     ChitchatSubTask,
+    ComparisonSubTask,
     IntentCategory,
     TaskStatus,
 )
@@ -72,7 +73,6 @@ async def intent_decomposer_node(state: ShopmindAgentState, runtime: Runtime[Sho
                     keywords=intent_item.extracted_slots.get("keywords", []),
                     filters=intent_item.extracted_slots.get("filters", {}),
                     is_replace_products=intent_item.is_replace_products,
-                    searched_pages=[0],
                     max_search_loop=max_search_loop
                 )
                 subtasks.append(current_subtask)
@@ -106,6 +106,27 @@ async def intent_decomposer_node(state: ShopmindAgentState, runtime: Runtime[Sho
                 )
                 current_subtask = new_subtask
                 subtasks.append(new_subtask)
+
+        elif intent_item.intent == IntentCategory.COMPARISON:
+            if is_new:
+                # 创建 ComparisonSubTask，从 matched_task_id 获取 has_recommended_product_ids
+                product_ids = []
+                if intent_item.matched_task_id:
+                    for t in subtasks:
+                        if t.task_id == intent_item.matched_task_id:
+                            if isinstance(t, ShoppingSubTask):
+                                product_ids = t.has_recommended_product_ids or []
+                            break
+
+                new_subtask = ComparisonSubTask(
+                    category=IntentCategory.COMPARISON,
+                    sub_query=intent_item.sub_query,
+                    status=TaskStatus.NEW,
+                    product_ids=product_ids,
+                )
+                current_subtask = new_subtask
+                subtasks.append(new_subtask)
+
         # 加入本轮的目标任务
         state["current_tasks"].append(current_subtask)
 
@@ -181,6 +202,7 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
                     history_context += f"  product_category: {task.product_category}\n"
                     history_context += f"  keywords: {task.keywords}\n"
                     history_context += f"  filters: {task.filters}\n"
+                    history_context += f"  has_recommended_product_ids: {task.has_recommended_product_ids}\n"
                     history_context += f"  created_at: {task.created_at}\n\n"
 
     INTENT_ANALYSIS_PROMPT = """
@@ -188,7 +210,7 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
     你是一个电商领域的智能意图分析与问题分解专家。你的任务是将用户的输入拆解为独立的原子子问题，并为每个子问题分配准确的意图类别，同时提取购物相关的槽位信息。
 
     # Intent Categories Definition
-    请严格基于以下三个类别进行分类：
+    请严格基于以下四个类别进行分类：
     1. **SHOPPING**:
        - 定义：与商品查找、推荐、比价、属性确认（比如购物时，用户澄清自己的需求）的意图。
        - 典型场景："我想买跑鞋"、"iPhone 15 多少钱"、"有没有红色的裙子"、"推荐适合送老人的礼物"。
@@ -198,8 +220,19 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
        - 典型场景："怎么申请退款"、"发货需要几天"、"运费险怎么赔"、"如何修改收货地址"、"会员有什么权益"、"假货怎么投诉"。
 
     3. **CHITCHAT**:
-       - 定义：非任务型的闲聊、问候、情感交流，或与电商完全无关的通用知识问答。
+       - 定义：非任务型的闲聊、问候、情感交流，或与电商完全无关的通用知识问答，以及泛泛的品牌/品类比较讨论。
        - 典型场景："你好"、"今天天气不错"、"讲个笑话"、"你是谁"、"地球为什么是圆的"。
+       - **比较类讨论（走 CHITCHAT）**：
+         - 用户说了具体品牌名进行比较，如"华为和iPhone选哪个"、"联想和戴尔哪个好"
+         - 用户问的是泛泛的选择问题，如"休闲裤还是工装裤"、"空调和电扇用哪个"
+         - 用户只表达对商品的感受，如"这件商品不错"、"那个好看"
+
+    4. **COMPARISON**:
+       - 定义：用户使用代词指代我们已推荐的商品，需要进行具体商品比较的场景。
+       - **触发条件（必须同时满足）**：
+         1. 用户使用了代词（"这几个"、"那些"、"那个"等）
+         2. 历史的 ShoppingSubTask 中 has_recommended_product_ids 非空
+       - 典型场景："这几个有什么区别"、"那几个呢"、"推荐买哪个"
 
     # Decomposition Rules (关键步骤)
     1. **原子化拆分**: 如果用户的一句话包含多个独立的需求（例如："我想买双鞋，另外问问怎么退货"），必须将其拆分为两个独立的 `IntentItem`。
@@ -243,8 +276,9 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
     # Output Format
     - 必须输出合法的 JSON，符合提供的 Pydantic schema。
     - `intent_items` 列表不能为空。
-    - `intent` 字段必须是枚举值之一：SHOPPING, PLATFORM, CHITCHAT。
+    - `intent` 字段必须是枚举值之一：SHOPPING, PLATFORM, CHITCHAT, COMPARISON。
     - 对于 PLATFORM 和 CHITCHAT 类型，`is_new` 固定为 true，`matched_task_id` 为 null，`extracted_slots` 为空字典，`explicit_search` 固定为 false，`is_replace_products` 固定为 false。
+    - 对于 COMPARISON 类型，`is_new` 固定为 true，`matched_task_id` 为匹配到的 ShoppingSubTask 的 task_id，`extracted_slots` 为空字典。
     - `extracted_slots` 字段必须包含：product_category, keywords, filters（SHOPPING 意图）。
     - `explicit_search` 字段表示用户是否明确表示要立即搜索商品：
       - explicit_search=true：用户说"搜一下"、"就这个了"、"差不多就行"、"随便、任意"
@@ -479,6 +513,78 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
       "intent_items": [
         {
           "sub_query": "你好呀，今天天气不错",
+          "intent": "CHITCHAT",
+          "is_new": true,
+          "matched_task_id": null,
+          "extracted_slots": {},
+          "is_replace_products": false
+        }
+      ]
+    }
+
+    ## 示例10：品牌级比较 - 走 CHITCHAT
+    User: "华为和iPhone选哪个好？"
+    Assistant:
+    {
+      "intent_items": [
+        {
+          "sub_query": "华为和iPhone选哪个好？",
+          "intent": "CHITCHAT",
+          "is_new": true,
+          "matched_task_id": null,
+          "extracted_slots": {},
+          "is_replace_products": false
+        }
+      ]
+    }
+
+    ## 示例11：泛泛的选择讨论 - 走 CHITCHAT
+    User: "休闲裤还是工装裤好看？"
+    Assistant:
+    {
+      "intent_items": [
+        {
+          "sub_query": "休闲裤还是工装裤好看？",
+          "intent": "CHITCHAT",
+          "is_new": true,
+          "matched_task_id": null,
+          "extracted_slots": {},
+          "is_replace_products": false
+        }
+      ]
+    }
+
+    ## 示例12：商品比较 - 走 COMPARISON（有代词 + 有推荐商品）
+    User: "这几个有什么区别？"
+    Historical Shopping Subtasks:
+    - task_id: task_001
+      original_query: 推荐几款电脑
+      product_category: 电脑
+      keywords: []
+      filters: {}
+      has_recommended_product_ids: [1001, 1002, 1003]
+      clarification_count: 0
+    Assistant:
+    {
+      "intent_items": [
+        {
+          "sub_query": "这几个有什么区别？",
+          "intent": "COMPARISON",
+          "is_new": true,
+          "matched_task_id": "task_001",
+          "extracted_slots": {},
+          "is_replace_products": false
+        }
+      ]
+    }
+
+    ## 示例13：购物感受 - 走 CHITCHAT
+    User: "这件商品不错"
+    Assistant:
+    {
+      "intent_items": [
+        {
+          "sub_query": "这件商品不错",
           "intent": "CHITCHAT",
           "is_new": true,
           "matched_task_id": null,

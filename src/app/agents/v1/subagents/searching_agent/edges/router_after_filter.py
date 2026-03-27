@@ -1,10 +1,10 @@
 """filter节点后路由"""
 
 from typing import Literal
-from app.agents.v1.schema import ShoppingSubgraphState
+from app.agents.v1.schema import SearchingSubgraphState
 
 
-def router_after_filter(state: ShoppingSubgraphState) -> Literal["generate_node", "ready_node"]:
+def router_after_filter(state: SearchingSubgraphState) -> Literal["generate_node", "ready_node"]:
     """filer_node 之后的条件边"""
     task = state["task"]
     # 如果没有过滤出任何商品
