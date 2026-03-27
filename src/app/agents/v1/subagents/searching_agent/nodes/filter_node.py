@@ -13,7 +13,7 @@ async def filter_node(state: SearchingSubgraphState, context: ShopmindAssistantC
     """对工具搜索结果进行 LLM 语义过滤，并更新 has_searched_product_id"""
     task: ShoppingSubTask = state["task"]
     searched_details: list[ProductResponseDto] = state.get("searched_details", [])
-    llm = context.llm
+    llm = context.reasoning_llm
     thread_id = context.thread_id
 
     logger.info(f"[FilterNode] thread_id: {thread_id}, task_id: {task.task_id}, is_replace_products={task.is_replace_products}")

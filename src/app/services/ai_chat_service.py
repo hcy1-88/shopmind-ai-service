@@ -116,6 +116,7 @@ class AIChatService:
 
             # 上下文
             context = ShopmindAssistantContext(llm=llm_service.get_llm_service().get_chat_model(),
+                                               reasoning_llm=llm_service.get_llm_service().get_reasoning_model(),
                                                thread_id=thread_id,
                                                max_clarification_count=self.max_clarification_count,
                                                max_history_task_count=self.max_history_task_count,

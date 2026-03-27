@@ -92,6 +92,21 @@ class LLMService:
 
         return self.provider.get_vision_model(**kwargs)
 
+    def get_reasoning_model(self, **kwargs) -> BaseChatModel:
+        """
+        获取推理模型实例.
+
+        Args:
+            **kwargs: 额外的模型参数
+
+        Returns:
+            BaseChatModel 实例，若未配置则降级返回 chat_model
+        """
+        if not self.provider:
+            raise RuntimeError("LLM Provider 未初始化")
+
+        return self.provider.get_reasoning_model(**kwargs)
+
     def reload_config(self) -> None:
         """从 Nacos 重新加载配置."""
         logger.info("重新加载 LLM 配置")

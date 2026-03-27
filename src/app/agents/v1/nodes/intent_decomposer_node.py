@@ -43,7 +43,7 @@ def _filter_active_subtasks(subtasks: list[SubTask], max_count) -> list[SubTask]
 async def intent_decomposer_node(state: ShopmindAgentState, runtime: Runtime[ShopmindAssistantContext]):
     """意图分解器节点，负责把用户的 query 分解成 subtask 列表"""
     context = runtime.context
-    llm = context.llm
+    llm = context.reasoning_llm
     max_clarification_count = context.max_clarification_count
     max_history_task_count = context.max_history_task_count
     max_search_loop = context.max_search_loop

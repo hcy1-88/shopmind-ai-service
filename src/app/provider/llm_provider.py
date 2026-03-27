@@ -33,9 +33,9 @@ class LLMProvider(ABC):
         pass
 
     @abstractmethod
-    def get_reasoner_model(self, **kwargs) -> BaseChatModel:
+    def get_reasoning_model(self, **kwargs) -> BaseChatModel:
         """
-        Get reasoner model instance.
+        Get reasoning model instance.
         """
         pass
 
@@ -94,8 +94,25 @@ class OpenAIProvider(LLMProvider):
 
         return ChatOpenAI(**model_kwargs)
 
-    def get_reasoner_model(self, **kwargs) -> BaseChatModel:
-        return self.get_chat_model()
+    def get_reasoning_model(self, **kwargs) -> BaseChatModel:
+        """Get OpenAI reasoning model."""
+        model_kwargs = {
+            "model": kwargs.get("model", self.config.get("reasoning_model")),
+            "temperature": kwargs.get(
+                "temperature",
+                self.config.get("temperature", 0.7),
+            ),
+            "max_tokens": kwargs.get("max_tokens", self.config.get("max_tokens", 4000)),
+            "timeout": kwargs.get("timeout", self.config.get("timeout", 120)),
+        }
+
+        # Set API key and base URL
+        if self.config.get("api_key"):
+            model_kwargs["api_key"] = self.config["api_key"]
+        if self.config.get("api_base"):
+            model_kwargs["base_url"] = self.config["api_base"]
+
+        return ChatOpenAI(**model_kwargs)
 
 
 class TongyiProvider(LLMProvider):
@@ -118,5 +135,22 @@ class TongyiProvider(LLMProvider):
         """Get Tongyi vision model."""
         return OpenAIProvider(self.config).get_vision_model(**kwargs)
 
-    def get_reasoner_model(self, **kwargs) -> BaseChatModel:
-        return self.get_chat_model()
+    def get_reasoning_model(self, **kwargs) -> BaseChatModel:
+        """Get Tongyi reasoning model."""
+        model_kwargs = {
+            "model": kwargs.get("model", self.config.get("reasoning_model")),
+            "temperature": kwargs.get(
+                "temperature",
+                self.config.get("temperature", 0.7),
+            ),
+            "max_tokens": kwargs.get("max_tokens", self.config.get("max_tokens", 4000)),
+            "timeout": kwargs.get("timeout", self.config.get("timeout", 120)),
+        }
+
+        # Set API key and base URL
+        if self.config.get("api_key"):
+            model_kwargs["api_key"] = self.config["api_key"]
+        if self.config.get("api_base"):
+            model_kwargs["base_url"] = self.config["api_base"]
+
+        return ChatOpenAI(**model_kwargs)

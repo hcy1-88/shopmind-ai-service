@@ -93,6 +93,8 @@ class ComparisonSubTask(SubTask):
 
 class ShopmindAssistantContext(BaseModel):
     llm: BaseChatModel
+    # 推理模型，用于 intent_decomposer_node 和 filter_node 等需要严谨推理的节点
+    reasoning_llm: BaseChatModel
     thread_id: str
     # 最大澄清轮次
     max_clarification_count: int
