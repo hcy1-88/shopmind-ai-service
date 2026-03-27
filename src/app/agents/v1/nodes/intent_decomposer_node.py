@@ -227,7 +227,7 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
        - 用户明确说："推荐手机" → product_category: "手机"
        - 用户说"这个有便宜的吗" + 历史有品类 → 沿用历史品类
 
-    2. **keywords（关键词）**: 搜索关键词/扩展词，如拍照好看、续航久、红色等
+    2. **keywords（关键词）**: 搜索关键词/扩展词，如拍照好看、续航久、红色、华为等
        - 用户说"拍照好看的" → keywords: ["拍照好看"]
        - 用户说"续航久" → keywords: ["续航久"]
 

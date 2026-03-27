@@ -80,4 +80,4 @@ async def generate_node(state: ShoppingSubgraphState, context: ShopmindAssistant
     # 重置"换一批"
     task.is_replace_products = False
 
-    return {"subgraph_messages": subgraph_messages, "task": task}
+    return {"subgraph_messages": subgraph_messages, "task": task, "search_count_loop": 0}

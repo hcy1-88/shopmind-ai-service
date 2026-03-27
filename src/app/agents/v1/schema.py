@@ -63,14 +63,14 @@ class SubTask(BaseModel):
 
 class ShoppingSubTask(SubTask):
     """购物意图的 SubTask"""
-    product_category: str | None = Field(default=None, description="商品品类（核心词），如手机、耳机")
+    product_category: str | None = Field(default=None, description="商品品类（核心词，表示最小售卖单位），如手机、耳机，核心词只能是一个")
     keywords: list[str] = Field(default_factory=list, description="搜索关键词（扩展词）")
     filters: dict = Field(default_factory=dict, description="过滤条件，如价格区间、颜色等")
     has_recommended_product_ids: list[int] = Field(default_factory=list, description="已经搜索过的商品，用户要求换一批时有用")
     # 已经使用过的搜索页号
     searched_pages: list[int]
     is_replace_products: bool = Field(default=False, description="是否为换一批场景，为 true 时 filter_node 排除已推荐商品")
-    # 一次对话内，调用搜索工具的循环次数（filter_node -> ready_node）
+    # 一次对话内，调用搜索工具的最大循环次数（filter_node -> ready_node）
     max_search_loop: int
 
 

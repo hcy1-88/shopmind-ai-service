@@ -52,7 +52,7 @@ async def aggregate_node(state: ShopmindAgentState, runtime: Runtime[ShopmindAss
         answer = await _generate_coherent_answer(llm, task_responses)
 
     logger.info(f"[AggregateNode] thread_id: {thread_id}, answer length: {len(answer)}")
-    return {"answer": answer}
+    return {"answer": answer, "is_replace_products": False}
 
 
 async def _generate_coherent_answer(llm, task_responses: list[dict]) -> str:
