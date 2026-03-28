@@ -29,7 +29,8 @@ class RedisClient:
         """连接 Redis."""
         try:
             nacos_client = get_nacos_client()
-            redis_config = nacos_client.get_redis_config()
+            chat_config = nacos_client.get_chat_config()
+            redis_config = chat_config["checkpointer"]["redis"]
             
             # 构建连接参数
             connect_params = {

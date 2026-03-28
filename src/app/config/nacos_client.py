@@ -214,15 +214,6 @@ class NacosClient:
         raise ValueError("嵌入模型 配置缺失，服务启动失败！")
 
 
-    def get_redis_config(self) -> dict[str, Any]:
-        """获取 Redis 配置"""
-        nacos_config = self.config_from_nacos
-        NAME = "redis"
-        if NAME in nacos_config:
-            return nacos_config[NAME]
-        raise ValueError("redis 配置项缺失，服务启动失败！")
-
-    
     def get_chat_config(self) -> dict[str, Any]:
         """
         获取 chat 配置，nacos 示例：

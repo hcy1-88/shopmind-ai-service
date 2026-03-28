@@ -43,7 +43,8 @@ class RedisCheckpointSaver(BaseCheckpointSaver):
         
         # 创建同步 Redis 连接（用于 checkpoint 操作）
         nacos_client = get_nacos_client()
-        redis_config = nacos_client.get_redis_config()
+        chat_config = nacos_client.get_chat_config()
+        redis_config = chat_config["checkpointer"]["redis"]
         
         self.redis = redis.from_url(
             redis_config["url"],
@@ -82,7 +83,8 @@ class RedisCheckpointSaver(BaseCheckpointSaver):
         """获取异步 Redis 连接"""
         if not hasattr(self, '_async_redis') or self._async_redis is None:
             nacos_client = get_nacos_client()
-            redis_config = nacos_client.get_redis_config()
+            chat_config = nacos_client.get_chat_config()
+            redis_config = chat_config["checkpointer"]["redis"]
             self._async_redis = await self._create_async_redis(redis_config)
         return self._async_redis
     
