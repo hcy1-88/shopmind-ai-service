@@ -47,7 +47,7 @@ class AgentTraceCallback(AsyncCallbackHandler):
         **kwargs: Any,
     ) -> None:
         """节点开始执行时调用"""
-        name = serialized.get("name", "unknown") if serialized else "unknown"
+        name = kwargs.get("name", "unknown") if kwargs else "unknown"
         self._node_info[str(run_id)] = {
             "name": name,
             "start_time": time.perf_counter(),

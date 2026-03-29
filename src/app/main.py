@@ -52,7 +52,7 @@ async def lifespan(app: FastAPI):
 
         # Setup logging (必须在记录日志之前配置)
         log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
-        setup_logger(level=log_level)  # 使用关键字参数确保正确传递 level
+        setup_logger(level=log_level, log_dir=settings.log_dir)  # 使用关键字参数确保正确传递 level
         
         logger.info("正在启动 Shopmind AI service...")
 
