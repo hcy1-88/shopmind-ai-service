@@ -16,12 +16,24 @@ from app.middleware.trace_middleware import TraceIDMiddleware
 from app.routers import ai_ask_router, ai_product_router, rag_router
 from app.schemas.result_context import ResultContext
 from app.services.ai_chat_service import init_ai_chat_service
+from app.checkpoints.postgres_checkpoint import PostgresCheckpoint
 from app.services.embedding_service import init_embedding_service
 from app.services.llm_service import init_llm_service
 from app.services.rag_service import init_rag_service
 from app.utils.logger import app_logger as logger
 from app.utils.logger import setup_logger
 from app.vector_store import init_milvus
+
+
+def _build_postgres_uri(postgres_config: dict) -> str:
+    """构建 PostgreSQL 连接 URI"""
+    host = postgres_config.get("host", "localhost")
+    port = postgres_config.get("port", 5432)
+    database = postgres_config.get("database", "shopmind")
+    user = postgres_config.get("user", "postgres")
+    password = postgres_config.get("password", "")
+    sslmode = postgres_config.get("sslmode", "disable")
+    return f"postgresql://{user}:{password}@{host}:{port}/{database}?sslmode={sslmode}"
 
 
 @asynccontextmanager
@@ -62,8 +74,21 @@ async def lifespan(app: FastAPI):
         logger.info("Shopmind AI service 启动成功！")
 
         # 初始化对话
-        init_ai_chat_service()
-        logger.info("AI 对话初始化成功！")
+        # 检查是否使用 Postgres checkpoint
+        chat_config = get_nacos_client().get_chat_config()
+        checkpoint_provider = chat_config.get("checkpoint_provider", "redis")
+
+        if checkpoint_provider == "postgres":
+            # PostgreSQL checkpointer - 在 lifespan 中创建并注入
+            postgres_config = chat_config.get("checkpointer", {}).get("postgres", {})
+            db_uri = _build_postgres_uri(postgres_config)
+            checkpointer = await PostgresCheckpoint.get_async_checkpoint(db_uri)
+            init_ai_chat_service(checkpointer)
+            logger.info(f"AI 对话初始化成功（PostgresCheckpoint），DB: {postgres_config.get('host')}:{postgres_config.get('port')}/{postgres_config.get('database')}")
+        else:
+            # Redis checkpointer
+            init_ai_chat_service()
+            logger.info("AI 对话初始化成功（RedisCheckpoint）")
 
         # 初始化 RAG 服务
         init_rag_service()

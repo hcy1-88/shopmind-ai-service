@@ -17,7 +17,7 @@ from app.utils.logger import app_logger as logger
 class AIChatService:
     """
     AI 对话服务（单例模式）
-    
+
     架构说明：
     1. Redis Checkpoint 存储，所有用户共享同一个实例
     2. 通过 thread_id（即 session_id）来区分不同会话，实现多会话隔离
@@ -25,38 +25,54 @@ class AIChatService:
     4. 支持流式输出和对话历史管理
     5. 消息历史默认 2 小时过期
     """
-    
+
     _instance: Optional["AIChatService"] = None
-    
-    def __init__(self):
-        """初始化 AI 对话服务"""
+
+    def __init__(self, checkpointer=None):
+        """初始化 AI 对话服务
+
+        Args:
+            checkpointer: checkpointer 实例。如果为 None，则根据配置自动创建。
+        """
+        self._graph = None
+
         # 获取聊天配置
         chat_config = get_nacos_client().get_chat_config()
-        checkpoint_provider = chat_config.get("checkpoint_provider", "redis")
 
-        # 根据配置初始化 checkpointer
-        if checkpoint_provider == "postgres":
-            # PostgreSQL checkpointer
-            postgres_config = chat_config.get("checkpointer", {}).get("postgres", {})
-            db_uri = self._build_postgres_uri(postgres_config)
-            postgres_checkpoint = PostgresCheckpoint()
-            self.checkpointer = postgres_checkpoint.get_checkpoint(db_uri)
-            logger.info(f"AIChatService 使用 PostgresCheckpoint，DB: {postgres_config.get('host')}:{postgres_config.get('port')}/{postgres_config.get('database')}")
+        # 如果传入了 checkpointer，直接使用
+        if checkpointer is not None:
+            self.checkpointer = checkpointer
+            logger.info("AIChatService 使用注入的 checkpointer")
         else:
-            # Redis checkpointer（默认）
-            ttl = chat_config.get("checkpoint_expire", 2)
-            self.checkpointer = get_redis_checkpoint_saver(ttl=ttl*3600)
-            logger.info(f"AIChatService 使用 RedisCheckpoint，TTL: {ttl}小时")
+            # 根据配置初始化 checkpointer（兼容旧模式）
+            checkpoint_provider = chat_config.get("checkpoint_provider", "redis")
+
+            if checkpoint_provider == "postgres":
+                # PostgreSQL checkpointer
+                postgres_config = chat_config.get("checkpointer", {}).get("postgres", {})
+                db_uri = self._build_postgres_uri(postgres_config)
+                postgres_checkpoint = PostgresCheckpoint()
+                self.checkpointer = postgres_checkpoint.get_checkpoint(db_uri)
+                logger.info(f"AIChatService 使用 PostgresCheckpoint，DB: {postgres_config.get('host')}:{postgres_config.get('port')}/{postgres_config.get('database')}")
+            else:
+                # Redis checkpointer（默认）
+                ttl = chat_config.get("checkpoint_expire", 2)
+                self.checkpointer = get_redis_checkpoint_saver(ttl=ttl*3600)
+                logger.info(f"AIChatService 使用 RedisCheckpoint，TTL: {ttl}小时")
 
         # 提取其他配置
         self.max_clarification_count = chat_config.get("max_clarification_count", 3)
         self.max_history_task_count = chat_config.get("max_history_task_count", 3)
         self.max_search_loop = chat_config.get("max_search_loop", 3)
 
-        # 通过工厂统一初始化所有图（父图 + 所有子图）
-        self.graph = GraphFactory.build_all(self.checkpointer).get_graph()
-
+        # 注意：不再在这里初始化 graph，改为懒加载
         logger.info("AIChatService 初始化完成")
+
+    def _ensure_graph(self):
+        """懒加载初始化 graph"""
+        if self._graph is None:
+            self._graph = GraphFactory.build_all(self.checkpointer).get_graph()
+        return self._graph
 
     def _build_postgres_uri(self, postgres_config: dict) -> str:
         """构建 PostgreSQL 连接 URI"""
@@ -67,7 +83,7 @@ class AIChatService:
         password = postgres_config.get("password", "")
         sslmode = postgres_config.get("sslmode", "disable")
         return f"postgresql://{user}:{password}@{host}:{port}/{database}?sslmode={sslmode}"
-    
+
     @classmethod
     def get_instance(cls) -> "AIChatService":
         """获取单例实例"""
@@ -124,7 +140,8 @@ class AIChatService:
             )
             
             # 流式输出（使用 astream_events 捕获完整事件流）
-            async for event in self.graph.astream_events(
+            graph = self._ensure_graph()
+            async for event in graph.astream_events(
                 {"messages": input_messages, "original_query": request.question},
                 context=context,
                 config=config,
@@ -346,5 +363,14 @@ def get_ai_chat_service() -> AIChatService:
     """获取 AI 对话服务单例"""
     return AIChatService.get_instance()
 
-def init_ai_chat_service() -> None:
-    get_ai_chat_service()
+def init_ai_chat_service(checkpointer=None) -> None:
+    """初始化 AI 对话服务
+
+    Args:
+        checkpointer: 可选的 checkpointer 实例，用于注入
+    """
+    if checkpointer is not None:
+        # 使用注入的 checkpointer 创建实例
+        AIChatService._instance = AIChatService(checkpointer)
+    else:
+        get_ai_chat_service()
