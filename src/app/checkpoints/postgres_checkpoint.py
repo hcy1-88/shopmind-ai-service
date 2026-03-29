@@ -91,9 +91,10 @@ class PostgresCheckpoint:
 
     async def _setup_conversations_table(self) -> None:
         """创建 conversations 表（如果不存在）"""
-        async with self._pool.cursor() as cur:
-            await cur.execute(CONVERSATIONS_TABLE_DDL)
-            await cur.execute(CONVERSATIONS_INDEX_DDL)
+        async with self._pool.connection() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(CONVERSATIONS_TABLE_DDL)
+                await cur.execute(CONVERSATIONS_INDEX_DDL)
 
     # ========== 委托给内部 saver 的 Checkpoint 方法 ==========
 
@@ -155,17 +156,18 @@ class PostgresCheckpoint:
         """
         await self._ensure_initialized()
         try:
-            async with self._pool.cursor() as cur:
-                await cur.execute(
-                    """
-                    SELECT session_id, conversation_name as name
-                    FROM conversations
-                    WHERE user_id = %s
-                    ORDER BY updated_at DESC
-                    """,
-                    (user_id,),
-                )
-                rows = await cur.fetchall()
+            async with self._pool.connection() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        """
+                        SELECT session_id, conversation_name as name
+                        FROM conversations
+                        WHERE user_id = %s
+                        ORDER BY updated_at DESC
+                        """,
+                        (user_id,),
+                    )
+                    rows = await cur.fetchall()
                 return [
                     {"session_id": row["session_id"], "name": row["name"]}
                     for row in rows
@@ -191,17 +193,18 @@ class PostgresCheckpoint:
         await self._ensure_initialized()
         try:
             conversation_id = gen_id()
-            async with self._pool.cursor() as cur:
-                await cur.execute(
-                    """
-                    INSERT INTO conversations (id, user_id, session_id, conversation_name)
-                    VALUES (%s, %s, %s, %s)
-                    ON CONFLICT (user_id, session_id)
-                    DO UPDATE SET conversation_name = EXCLUDED.conversation_name,
-                                 updated_at = CURRENT_TIMESTAMP
-                    """,
-                    (conversation_id, user_id, session_id, name),
-                )
+            async with self._pool.connection() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        """
+                        INSERT INTO conversations (id, user_id, session_id, conversation_name)
+                        VALUES (%s, %s, %s, %s)
+                        ON CONFLICT (user_id, session_id)
+                        DO UPDATE SET conversation_name = EXCLUDED.conversation_name,
+                                     updated_at = CURRENT_TIMESTAMP
+                        """,
+                        (conversation_id, user_id, session_id, name),
+                    )
             logger.info(
                 f"创建对话成功: user_id={user_id}, session_id={session_id}, name={name}"
             )
@@ -226,17 +229,18 @@ class PostgresCheckpoint:
         """
         await self._ensure_initialized()
         try:
-            async with self._pool.cursor() as cur:
-                await cur.execute(
-                    """
-                    INSERT INTO conversations (id, user_id, session_id, conversation_name)
-                    VALUES (%s, %s, %s, %s)
-                    ON CONFLICT (user_id, session_id)
-                    DO UPDATE SET conversation_name = EXCLUDED.conversation_name,
-                                 updated_at = CURRENT_TIMESTAMP
-                    """,
-                    (gen_id(), user_id, session_id, name),
-                )
+            async with self._pool.connection() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        """
+                        INSERT INTO conversations (id, user_id, session_id, conversation_name)
+                        VALUES (%s, %s, %s, %s)
+                        ON CONFLICT (user_id, session_id)
+                        DO UPDATE SET conversation_name = EXCLUDED.conversation_name,
+                                     updated_at = CURRENT_TIMESTAMP
+                        """,
+                        (gen_id(), user_id, session_id, name),
+                    )
             logger.info(f"更新对话名称成功: session_id={session_id}, name={name}")
             return True
         except Exception as e:
@@ -256,11 +260,12 @@ class PostgresCheckpoint:
         """
         await self._ensure_initialized()
         try:
-            async with self._pool.cursor() as cur:
-                await cur.execute(
-                    "DELETE FROM conversations WHERE user_id = %s AND session_id = %s",
-                    (user_id, session_id),
-                )
+            async with self._pool.connection() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        "DELETE FROM conversations WHERE user_id = %s AND session_id = %s",
+                        (user_id, session_id),
+                    )
             await self.clear_thread_history(session_id)
             logger.info(f"删除对话成功: session_id={session_id}")
             return True
@@ -283,15 +288,16 @@ class PostgresCheckpoint:
         """
         await self._ensure_initialized()
         try:
-            async with self._pool.cursor() as cur:
-                await cur.execute(
-                    """
-                    SELECT conversation_name FROM conversations
-                    WHERE user_id = %s AND session_id = %s
-                    """,
-                    (user_id, session_id),
-                )
-                row = await cur.fetchone()
+            async with self._pool.connection() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        """
+                        SELECT conversation_name FROM conversations
+                        WHERE user_id = %s AND session_id = %s
+                        """,
+                        (user_id, session_id),
+                    )
+                    row = await cur.fetchone()
                 if row:
                     return row["conversation_name"]
                 return None
