@@ -2,6 +2,8 @@
 
 import logging
 import sys
+from logging.handlers import TimedRotatingFileHandler
+from pathlib import Path
 
 from pythonjsonlogger import json
 
@@ -27,13 +29,14 @@ class TraceIDFilter(logging.Filter):
         return True
 
 
-def setup_logger(name: str = APP_LOGGER_NAME, level: int = logging.INFO) -> logging.Logger:
+def setup_logger(name: str = APP_LOGGER_NAME, level: int = logging.INFO, log_dir: str = "") -> logging.Logger:
     """
     Setup structured JSON logger.
 
     Args:
         name: Logger name
         level: Logging level
+        log_dir: Directory for agent trace log files. If empty, uses project root.
 
     Returns:
         Configured logger instance
@@ -47,12 +50,9 @@ def setup_logger(name: str = APP_LOGGER_NAME, level: int = logging.INFO) -> logg
 
     # Console handler with JSON formatter
     # 使用 sys.stderr 而不是 sys.stdout，避免被 uvicorn 重定向
-    handler = logging.StreamHandler(sys.stderr)
-    # 确保 handler 的级别不高于 logger 的级别
-    handler.setLevel(level)
-
-    # 添加 traceId 过滤器
-    handler.addFilter(TraceIDFilter())
+    console_handler = logging.StreamHandler(sys.stderr)
+    console_handler.setLevel(level)
+    console_handler.addFilter(TraceIDFilter())
 
     # JSON formatter
     # pythonjsonlogger 会自动将所有 record 属性包含在 JSON 中，包括 traceId
@@ -61,9 +61,31 @@ def setup_logger(name: str = APP_LOGGER_NAME, level: int = logging.INFO) -> logg
         timestamp=True,
         json_ensure_ascii=False,
     )
-    handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
 
-    logger.addHandler(handler)
+    # File handler for agent trace logs (TimedRotatingFileHandler, daily rotation, 7 days retention)
+    if log_dir:
+        log_dir_path = Path(log_dir)
+    else:
+        # 默认使用项目根目录
+        log_dir_path = Path(__file__).parent.parent.parent.parent
+
+    log_dir_path.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir_path / "shopmind_agent.log"
+
+    file_handler = TimedRotatingFileHandler(
+        filename=str(log_file),
+        when="midnight",
+        interval=1,
+        backupCount=7,
+        encoding="utf-8",
+    )
+    file_handler.setLevel(level)
+    file_handler.addFilter(TraceIDFilter())
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+
     logger.propagate = False
 
     return logger

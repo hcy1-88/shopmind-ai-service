@@ -1,10 +1,16 @@
 """Application settings and configuration management."""
 
+from pathlib import Path
 from typing import Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from app.utils.ip import get_local_ip
+
+
+def _default_log_dir() -> str:
+    """默认 log 目录为项目根目录"""
+    return str(Path(__file__).parent.parent.parent.parent)
 
 # 模块级别的单例实例（避免与 Pydantic 字段系统冲突）
 _settings_instance: Optional["Settings"] = None
@@ -25,6 +31,7 @@ class Settings(BaseSettings):
     app_version: str = Field(default="0.1.0", description="Application version")
     debug: bool = Field(default=False, description="Debug mode")
     log_level: str = Field(default="INFO", description="Logging level")
+    log_dir: str = Field(default_factory=_default_log_dir, description="Log directory for agent trace logs, defaults to project root")
 
     # Nacos Configuration
     nacos_server_addr: str = Field(

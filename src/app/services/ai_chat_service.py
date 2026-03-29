@@ -12,6 +12,7 @@ from app.services import llm_service
 from app.checkpoints import get_redis_checkpoint_saver
 from app.checkpoints.postgres_checkpoint import get_postgres_checkpoint
 from app.utils.logger import app_logger as logger
+from app.utils.agent_trace_callback import AgentTraceCallback
 
 
 class AIChatService:
@@ -125,9 +126,12 @@ class AIChatService:
             
             # 构建输入
             input_messages = [HumanMessage(content=request.question)]
-            
+
             # 配置
-            config = RunnableConfig(configurable={"thread_id": thread_id})
+            config = RunnableConfig(
+                configurable={"thread_id": thread_id},
+                callbacks=[AgentTraceCallback(thread_id=thread_id)],
+            )
 
             # 上下文
             context = ShopmindAssistantContext(llm=llm_service.get_llm_service().get_chat_model(),
