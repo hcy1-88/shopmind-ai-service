@@ -147,7 +147,6 @@ class AIChatService:
                 version="v2",
             ):
                 kind = event["event"]
-                logger.info(f"事件类型：【{kind}】")
                 name = event.get("name", "")
                 
                 # 处理 LLM 开始调用 - 思考开始
@@ -215,22 +214,36 @@ class AIChatService:
                         "result": result
                     })
                 
-                # 处理流式输出 token
+                # 处理流式输出 token（仅限 aggregator_node 的输出）
                 elif kind == "on_chat_model_stream":
-                    chunk = event.get("data", {}).get("chunk", "")
-                    if chunk:
-                        content = ""
-                        if hasattr(chunk, 'content'):
-                            content = chunk.content
-                        elif isinstance(chunk, str):
-                            content = chunk
-                        
-                        if content:
-                            yield self._format_sse_event("token_stream", {
-                                "content": content,
-                                "node": name
-                            })
-            
+                    if name == "aggregator_node":
+                        chunk = event.get("data", {}).get("chunk", "")
+                        if chunk:
+                            content = ""
+                            if hasattr(chunk, 'content'):
+                                content = chunk.content
+                            elif isinstance(chunk, str):
+                                content = chunk
+
+                            if content:
+                                yield self._format_sse_event("token_stream", {
+                                    "content": content,
+                                    "node": name
+                                })
+
+                # 处理图执行结束事件（单任务兜底：多任务时流式已发完，单任务时在此发完整答案）
+                elif kind == "on_chain_end" and name == "LangGraph":
+                    output = event.get("data", {}).get("output", {})
+                    if isinstance(output, dict):
+                        streaming_started = output.get("streaming_started", True)
+                        if not streaming_started:
+                            answer = output.get("answer", "")
+                            if answer:
+                                yield self._format_sse_event("token_stream", {
+                                    "content": answer,
+                                    "node": "aggregator_node"
+                                })
+
             # 发送完成事件
             yield self._format_sse_event("complete", {"message": "对话完成"})
             

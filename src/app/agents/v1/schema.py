@@ -115,6 +115,7 @@ class ShopmindAgentState(TypedDict):
     sub_task_results: Annotated[list[SubTask], operator.add]
     # Agent 最终发送给用户的回复
     answer: str | None
+    streaming_started: bool
 
 
 ## 平台规则节点的状态

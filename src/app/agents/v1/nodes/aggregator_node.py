@@ -41,18 +41,20 @@ async def aggregate_node(state: ShopmindAgentState, runtime: Runtime[ShopmindAss
             })
 
     if not task_responses:
-        return {"answer": "抱歉，暂时无法处理您的请求。"}
+        return {"answer": "抱歉，暂时无法处理您的请求。", "streaming_started": False}
 
     # 构建聚合 prompt
     if len(task_responses) == 1:
-        # 只有一个响应，直接返回
+        # 只有一个响应，直接返回，无 LLM 调用，不走流式
         answer = task_responses[0]["response"]
+        logger.info(f"[AggregateNode] thread_id: {thread_id}, answer length: {len(answer)}")
+        return {"answer": answer, "is_replace_products": False, "streaming_started": False}
     else:
-        # 多个响应，调用 LLM 整合
+        # 多个响应，调用 LLM 整合，流式输出
         answer = await _generate_coherent_answer(llm, task_responses)
 
     logger.info(f"[AggregateNode] thread_id: {thread_id}, answer length: {len(answer)}")
-    return {"answer": answer, "is_replace_products": False}
+    return {"answer": answer, "streaming_started": True}
 
 
 async def _generate_coherent_answer(llm, task_responses: list[dict]) -> str:
