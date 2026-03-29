@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import pickle
+from warnings import deprecated
+
 import redis
 import redis.asyncio as aioredis
 from typing import Optional, Any, Iterator
@@ -15,6 +17,7 @@ from app.config.nacos_client import get_nacos_client
 from app.utils.logger import app_logger as logger
 
 
+@deprecated("redis checkpoint 已经废弃，考虑到持久化问题，已迁移至 postgres checkpoint")
 class RedisCheckpointSaver(BaseCheckpointSaver):
     """
     基于 Redis 的 Checkpoint 存储

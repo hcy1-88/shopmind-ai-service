@@ -2,15 +2,13 @@
 
 import json
 from typing import AsyncGenerator, Optional
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from app.agents.v1.schema import ShopmindAssistantContext
 from app.agents.v1.graph_factory import GraphFactory
 from app.config.nacos_client import get_nacos_client
 from app.schemas.ai_ask_schema import AIAskRequest
 from app.services import llm_service
-from app.checkpoints import get_redis_checkpoint_saver
-from app.checkpoints.postgres_checkpoint import get_postgres_checkpoint
 from app.utils.logger import app_logger as logger
 from app.utils.agent_trace_callback import AgentTraceCallback
 
@@ -20,52 +18,34 @@ class AIChatService:
     AI 对话服务（单例模式）
 
     架构说明：
-    1. Redis Checkpoint 存储，所有用户共享同一个实例
-    2. 通过 thread_id（即 session_id）来区分不同会话，实现多会话隔离
-    3. thread_id = session_id（前端传递）
-    4. 支持流式输出和对话历史管理
-    5. 消息历史默认 2 小时过期
+    1. checkpointer: AsyncPostgresSaver，用于 LangGraph checkpoint 存储
+    2. conversations_manager: ConversationsManager，用于会话元数据管理
+    3. 通过 thread_id（即 session_id）来区分不同会话，实现多会话隔离
+    4. thread_id = session_id（前端传递）
+    5. 支持流式输出和对话历史管理
     """
 
     _instance: Optional["AIChatService"] = None
 
-    def __init__(self, checkpointer=None):
+    def __init__(self, checkpointer, conversations_manager):
         """初始化 AI 对话服务
 
         Args:
-            checkpointer: checkpointer 实例。如果为 None，则根据配置自动创建。
+            checkpointer: AsyncPostgresSaver 实例
+            conversations_manager: ConversationsManager 实例
         """
         self._graph = None
+        self.checkpointer = checkpointer
+        self.conversations_manager = conversations_manager
 
         # 获取聊天配置
         chat_config = get_nacos_client().get_chat_config()
-
-        # 如果传入了 checkpointer，直接使用
-        if checkpointer is not None:
-            self.checkpointer = checkpointer
-            logger.info("AIChatService 使用注入的 checkpointer")
-        else:
-            # 根据配置初始化 checkpointer（兼容旧模式）
-            checkpoint_provider = chat_config.get("checkpoint_provider", "redis")
-
-            if checkpoint_provider == "postgres":
-                # PostgreSQL checkpointer
-                postgres_config = chat_config.get("checkpointer", {}).get("postgres", {})
-                db_uri = self._build_postgres_uri(postgres_config)
-                self.checkpointer = get_postgres_checkpoint(db_uri)
-                logger.info(f"AIChatService 使用 PostgresCheckpoint，DB: {postgres_config.get('host')}:{postgres_config.get('port')}/{postgres_config.get('database')}")
-            else:
-                # Redis checkpointer（默认）
-                ttl = chat_config.get("checkpoint_expire", 2)
-                self.checkpointer = get_redis_checkpoint_saver(ttl=ttl*3600)
-                logger.info(f"AIChatService 使用 RedisCheckpoint，TTL: {ttl}小时")
 
         # 提取其他配置
         self.max_clarification_count = chat_config.get("max_clarification_count", 3)
         self.max_history_task_count = chat_config.get("max_history_task_count", 3)
         self.max_search_loop = chat_config.get("max_search_loop", 3)
 
-        # 注意：不再在这里初始化 graph，改为懒加载
         logger.info("AIChatService 初始化完成")
 
     def _ensure_graph(self):
@@ -73,16 +53,6 @@ class AIChatService:
         if self._graph is None:
             self._graph = GraphFactory.build_all(self.checkpointer).get_graph()
         return self._graph
-
-    def _build_postgres_uri(self, postgres_config: dict) -> str:
-        """构建 PostgreSQL 连接 URI"""
-        host = postgres_config.get("host", "localhost")
-        port = postgres_config.get("port", 5432)
-        database = postgres_config.get("database", "shopmind")
-        user = postgres_config.get("user", "postgres")
-        password = postgres_config.get("password", "")
-        sslmode = postgres_config.get("sslmode", "disable")
-        return f"postgresql://{user}:{password}@{host}:{port}/{database}?sslmode={sslmode}"
 
     @classmethod
     def get_instance(cls) -> "AIChatService":
@@ -267,19 +237,17 @@ class AIChatService:
     async def clear_history(self, session_id: str) -> bool:
         """
         清除对话历史
-        
+
         Args:
             session_id: 会话ID（即 thread_id）
-            
+
         Returns:
             是否清除成功
         """
         try:
-            thread_id = session_id
-            success = await self.checkpointer.clear_thread_history(thread_id)
-            if success:
-                logger.info(f"已清除会话历史: {thread_id}")
-            return success
+            await self.checkpointer.adelete_thread(session_id)
+            logger.info(f"已清除会话历史: {session_id}")
+            return True
         except Exception as e:
             logger.error(f"清除对话历史失败: {e}", exc_info=True)
             return False
@@ -287,19 +255,41 @@ class AIChatService:
     async def get_history(self, session_id: str) -> list[dict]:
         """
         获取对话历史
-        
+
         Args:
             session_id: 会话ID（即 thread_id）
-            
+
         Returns:
             消息历史列表
         """
         try:
-            thread_id = session_id
-            messages = await self.checkpointer.get_thread_messages(thread_id)
-            logger.info(f"获取会话历史: {thread_id}, 消息数量: {len(messages)}")
-            # 注意：开场白由前端显示，不再由后端自动添加
-            return messages
+            config = RunnableConfig(
+                configurable={"thread_id": session_id, "checkpoint_ns": ""}
+            )
+            tuple_result = await self.checkpointer.aget_tuple(config)
+            if not tuple_result:
+                return []
+
+            checkpoint = tuple_result.checkpoint
+            channel_values = checkpoint.get("channel_values", {})
+            messages = channel_values.get("messages", [])
+
+            result = []
+            for msg in messages:
+                if isinstance(msg, AIMessage) and not msg.content:
+                    continue
+                if isinstance(msg, ToolMessage):
+                    continue
+                if hasattr(msg, "type") and hasattr(msg, "content"):
+                    result.append(
+                        {
+                            "role": "user" if msg.type == "human" else "assistant",
+                            "content": msg.content,
+                        }
+                    )
+
+            logger.info(f"获取会话历史: {session_id}, 消息数量: {len(result)}")
+            return result
         except Exception as e:
             logger.error(f"获取对话历史失败: {e}", exc_info=True)
             return []
@@ -309,69 +299,74 @@ class AIChatService:
     async def get_conversation_list(self, user_id: str) -> list[dict]:
         """
         获取用户的所有对话列表
-        
+
         Args:
             user_id: 用户ID
-            
+
         Returns:
             对话列表
         """
         logger.info(f"获取用户【user_id: {user_id}】的消息历史列表")
-        return await self.checkpointer.get_conversation_list(user_id)
-    
+        return await self.conversations_manager.get_conversation_list(user_id)
+
     async def create_conversation(self, user_id: str, session_id: str, name: str) -> bool:
         """
         创建新对话
-        
+
         Args:
             user_id: 用户ID
             session_id: 会话ID
             name: 对话名称
-            
+
         Returns:
             是否创建成功
         """
-        return await self.checkpointer.create_conversation(user_id, session_id, name)
-    
+        return await self.conversations_manager.create_conversation(user_id, session_id, name)
+
     async def update_conversation_name(self, user_id: str, session_id: str, name: str) -> bool:
         """
         更新对话名称
-        
+
         Args:
             user_id: 用户ID
             session_id: 会话ID
             name: 新对话名称
-            
+
         Returns:
             是否更新成功
         """
-        return await self.checkpointer.update_conversation_name(user_id, session_id, name)
-    
+        return await self.conversations_manager.update_conversation_name(user_id, session_id, name)
+
     async def delete_conversation(self, user_id: str, session_id: str) -> bool:
         """
         删除对话
-        
+
         Args:
             user_id: 用户ID
             session_id: 会话ID
-            
+
         Returns:
             是否删除成功
         """
-        return await self.checkpointer.delete_conversation(user_id, session_id)
-    
+        # 删除会话元数据
+        deleted = await self.conversations_manager.delete_conversation(user_id, session_id)
+        if deleted:
+            # 同时清除 checkpoint 历史
+            await self.checkpointer.adelete_thread(session_id)
+        return deleted
+
     async def get_conversation_name(self, user_id: str, session_id: str) -> Optional[str]:
         """
         获取指定对话的名称
-        
+
         Args:
             user_id: 用户ID
             session_id: 会话ID
-            
+
         Returns:
             对话名称
         """
-        return await self.checkpointer.get_conversation_name(user_id, session_id)
+        return await self.conversations_manager.get_conversation_name(user_id, session_id)
     
 
 
@@ -379,14 +374,11 @@ def get_ai_chat_service() -> AIChatService:
     """获取 AI 对话服务单例"""
     return AIChatService.get_instance()
 
-def init_ai_chat_service(checkpointer=None) -> None:
+def init_ai_chat_service(checkpointer, conversations_manager) -> None:
     """初始化 AI 对话服务
 
     Args:
-        checkpointer: 可选的 checkpointer 实例，用于注入
+        checkpointer: AsyncPostgresSaver 实例
+        conversations_manager: ConversationsManager 实例
     """
-    if checkpointer is not None:
-        # 使用注入的 checkpointer 创建实例
-        AIChatService._instance = AIChatService(checkpointer)
-    else:
-        get_ai_chat_service()
+    AIChatService._instance = AIChatService(checkpointer, conversations_manager)

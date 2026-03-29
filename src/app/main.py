@@ -16,7 +16,9 @@ from app.middleware.trace_middleware import TraceIDMiddleware
 from app.routers import ai_ask_router, ai_product_router, rag_router
 from app.schemas.result_context import ResultContext
 from app.services.ai_chat_service import init_ai_chat_service
-from app.checkpoints.postgres_checkpoint import get_postgres_checkpoint
+from app.checkpoints.conversations_manager import ConversationsManager
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from psycopg_pool import AsyncConnectionPool
 from app.services.embedding_service import init_embedding_service
 from app.services.llm_service import init_llm_service
 from app.services.rag_service import init_rag_service
@@ -71,24 +73,37 @@ async def lifespan(app: FastAPI):
         await redis_client.connect()
         logger.info("Redis 初始化完成")
 
-        logger.info("Shopmind AI service 启动成功！")
-
-        # 初始化对话
-        # 检查是否使用 Postgres checkpoint
+        # 初始化对话（统一使用 Postgres checkpointer）
         chat_config = get_nacos_client().get_chat_config()
-        checkpoint_provider = chat_config.get("checkpoint_provider", "redis")
+        postgres_config = chat_config.get("checkpointer", {}).get("postgres", {})
+        db_uri = _build_postgres_uri(postgres_config)
 
-        if checkpoint_provider == "postgres":
-            # PostgreSQL checkpointer - 在 lifespan 中创建并注入
-            postgres_config = chat_config.get("checkpointer", {}).get("postgres", {})
-            db_uri = _build_postgres_uri(postgres_config)
-            checkpointer = get_postgres_checkpoint(db_uri)
-            init_ai_chat_service(checkpointer)
-            logger.info(f"AI 对话初始化成功（PostgresCheckpoint），DB: {postgres_config.get('host')}:{postgres_config.get('port')}/{postgres_config.get('database')}")
-        else:
-            # Redis checkpointer
-            init_ai_chat_service()
-            logger.info("AI 对话初始化成功（RedisCheckpoint）")
+        # 1. 创建 AsyncConnectionPool
+        connection_kwargs = {
+            "autocommit": True,
+            "prepare_threshold": 0,
+        }
+        pool = AsyncConnectionPool(
+            conninfo=db_uri,
+            max_size=20,
+            kwargs=connection_kwargs,
+        )
+        await pool.open()
+
+        # 2. 创建 AsyncPostgresSaver 并初始化表
+        checkpointer = AsyncPostgresSaver(pool)
+        await checkpointer.setup()
+
+        # 3. 创建 ConversationsManager 并初始化表
+        conversations_manager = ConversationsManager(pool)
+        await conversations_manager.ensure_initialized()
+
+        # 4. 注入到 AIChatService
+        init_ai_chat_service(checkpointer, conversations_manager)
+        logger.info(f"AI 对话初始化成功（AsyncPostgresSaver），DB: {postgres_config.get('host')}:{postgres_config.get('port')}/{postgres_config.get('database')}")
+
+        # 存储 pool 引用用于 shutdown 关闭
+        app.state.pg_pool = pool
 
         # 初始化 RAG 服务
         init_rag_service()
@@ -137,6 +152,12 @@ async def lifespan(app: FastAPI):
         redis_client = get_redis_client()
         await redis_client.close()
         logger.info("Redis 连接已关闭")
+
+        # 关闭 PostgreSQL pool
+        pg_pool = getattr(app.state, "pg_pool", None)
+        if pg_pool is not None:
+            await pg_pool.close()
+            logger.info("PostgreSQL 连接池已关闭")
 
         logger.info("Shopmind AI service 已关闭...")
 
