@@ -16,7 +16,7 @@ from app.middleware.trace_middleware import TraceIDMiddleware
 from app.routers import ai_ask_router, ai_product_router, rag_router
 from app.schemas.result_context import ResultContext
 from app.services.ai_chat_service import init_ai_chat_service
-from app.checkpoints.postgres_checkpoint import PostgresCheckpoint
+from app.checkpoints.postgres_checkpoint import get_postgres_checkpoint
 from app.services.embedding_service import init_embedding_service
 from app.services.llm_service import init_llm_service
 from app.services.rag_service import init_rag_service
@@ -82,7 +82,7 @@ async def lifespan(app: FastAPI):
             # PostgreSQL checkpointer - 在 lifespan 中创建并注入
             postgres_config = chat_config.get("checkpointer", {}).get("postgres", {})
             db_uri = _build_postgres_uri(postgres_config)
-            checkpointer = await PostgresCheckpoint.get_async_checkpoint(db_uri)
+            checkpointer = get_postgres_checkpoint(db_uri)
             init_ai_chat_service(checkpointer)
             logger.info(f"AI 对话初始化成功（PostgresCheckpoint），DB: {postgres_config.get('host')}:{postgres_config.get('port')}/{postgres_config.get('database')}")
         else:

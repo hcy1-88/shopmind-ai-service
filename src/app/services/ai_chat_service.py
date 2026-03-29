@@ -10,7 +10,7 @@ from app.config.nacos_client import get_nacos_client
 from app.schemas.ai_ask_schema import AIAskRequest
 from app.services import llm_service
 from app.checkpoints import get_redis_checkpoint_saver
-from app.checkpoints.postgres_checkpoint import PostgresCheckpoint
+from app.checkpoints.postgres_checkpoint import get_postgres_checkpoint
 from app.utils.logger import app_logger as logger
 
 
@@ -51,8 +51,7 @@ class AIChatService:
                 # PostgreSQL checkpointer
                 postgres_config = chat_config.get("checkpointer", {}).get("postgres", {})
                 db_uri = self._build_postgres_uri(postgres_config)
-                postgres_checkpoint = PostgresCheckpoint()
-                self.checkpointer = postgres_checkpoint.get_checkpoint(db_uri)
+                self.checkpointer = get_postgres_checkpoint(db_uri)
                 logger.info(f"AIChatService 使用 PostgresCheckpoint，DB: {postgres_config.get('host')}:{postgres_config.get('port')}/{postgres_config.get('database')}")
             else:
                 # Redis checkpointer（默认）
