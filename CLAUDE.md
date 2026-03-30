@@ -107,3 +107,10 @@ src/app/
 ├── vector_store/       # Milvus client and collections
 └── main.py             # Entry point with lifespan management
 ```
+
+## Agent
+if user asks questions about agent, you can read files bellow to understand the design of graph-agent :
+1. design-markdown - E:\work_directory\ShopMind\shopmind-python\shopmind-ai-service\docs\Agent设计方案.md
+2. agent code - E:\work_directory\ShopMind\shopmind-python\shopmind-ai-service\src\app\agents\v1
+3. entry to chat - E:\work_directory\ShopMind\shopmind-python\shopmind-ai-service\src\app\services\ai_chat_service.py
+4. project's README.md

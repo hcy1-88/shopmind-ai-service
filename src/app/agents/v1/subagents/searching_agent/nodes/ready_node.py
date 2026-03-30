@@ -1,21 +1,21 @@
 """就绪节点"""
 
 from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage
-from langchain_core.language_models import BaseChatModel
+from langgraph.runtime import Runtime
 
 from app.agents.v1.schema import SearchingSubgraphState, ShopmindAssistantContext
 from app.tools.chat_tool import search_product, get_product_detail
 from app.utils.logger import app_logger as logger
 
 
-async def ready_node(state: SearchingSubgraphState, context: ShopmindAssistantContext):
+async def ready_node(state: SearchingSubgraphState, runtime: Runtime[ShopmindAssistantContext]):
     """槽位齐全，根据商品信息调用 LLM 生成 tool call 或最终回复"""
     task = state["task"]
     subgraph_messages: list[BaseMessage] = state.get("subgraph_messages", [])
-    llm = context.llm
-    thread_id = context.thread_id
+    llm = runtime.context.llm
+    thread_id = runtime.context.thread_id
 
-    logger.info(f"[ReadyNode] thread_id: {thread_id}, task_id: {task.task_id}")
+    logger.info(f"[ready_node] thread_id: {thread_id}, task_id: {task.task_id}")
 
     # 如果是空消息列表，则构造消息列表
     if not subgraph_messages:

@@ -5,7 +5,6 @@
 @Time       : 2026/3/27
 @Author     : hcy18
 """
-from typing import Any
 
 from app.agents.v1.schema import ComparisonSubgraphState
 from app.tools.chat_tool import get_product_detail
@@ -28,10 +27,9 @@ async def detail_node(state: ComparisonSubgraphState) -> dict:
         dict: 更新 product_details 到状态中
     """
     product_ids = state.get("product_ids", [])
-    logger.info(f"[DetailNode] product_ids to fetch: {product_ids}")
+    logger.info(f"[detail_node] product_ids to fetch: {product_ids}")
 
     if not product_ids:
-        logger.warning(f"[DetailNode] No product_ids to compare")
         return {"product_details": []}
 
     # 并行获取商品详情
@@ -41,9 +39,7 @@ async def detail_node(state: ComparisonSubgraphState) -> dict:
             detail = await get_product_detail(product_id)
             if detail:
                 product_details.append(detail)
-        except Exception as e:
-            logger.error(f"[DetailNode] Failed to get detail for product {product_id}: {e}")
-
-    logger.info(f"[DetailNode] Fetched {len(product_details)} product details")
+        except Exception:
+            pass
 
     return {"product_details": product_details}

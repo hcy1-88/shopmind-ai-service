@@ -1,21 +1,20 @@
 """澄清节点"""
 
 from langchain_core.messages import BaseMessage, HumanMessage
-from langchain_core.language_models import BaseChatModel
-
+from langgraph.runtime import Runtime
 from app.agents.v1.schema import ShoppingSubTask, SearchingSubgraphState, ShopmindAssistantContext
 from app.agents.v1.utils import build_history_context
 from app.utils.logger import app_logger as logger
 
 
-async def clarifying_node(state: SearchingSubgraphState, context: ShopmindAssistantContext):
+async def clarifying_node(state: SearchingSubgraphState, runtime: Runtime[ShopmindAssistantContext]):
     """对当前购买商品进行澄清询问，生成问题"""
     task: ShoppingSubTask = state["task"]
     messages: list[BaseMessage] = state.get("messages", [])
-    llm = context.llm
-    thread_id = context.thread_id
+    llm = runtime.context.llm
+    thread_id = runtime.context.thread_id
 
-    logger.info(f"[ClarifyingNode] thread_id: {thread_id}, task_id: {task.task_id}")
+    logger.info(f"[clarifying_node] thread_id: {thread_id}, task_id: {task.task_id}")
 
     # 构建槽位状态描述
     product_category = task.product_category or "未指定"
@@ -60,7 +59,6 @@ async def clarifying_node(state: SearchingSubgraphState, context: ShopmindAssist
         question = response.content.strip()
         if not question:
             question = "能再告诉我一些关于您想要的商品信息吗？"
-        logger.info(f"[ClarifyingNode] 生成问题: {question}")
     except Exception as e:
         logger.error(f"[ClarifyingNode] LLM 调用失败: {e}", exc_info=True)
         question = "能再告诉我一些关于您想要的商品信息吗？"

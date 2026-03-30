@@ -5,7 +5,7 @@
 @Time       : 2026/3/8 21:42
 @Author     : hcy18
 """
-from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.output_parsers import JsonOutputParser, PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.runtime import Runtime
 from app.agents.v1.schema import (
@@ -43,21 +43,20 @@ def _filter_active_subtasks(subtasks: list[SubTask], max_count) -> list[SubTask]
 async def intent_decomposer_node(state: ShopmindAgentState, runtime: Runtime[ShopmindAssistantContext]):
     """意图分解器节点，负责把用户的 query 分解成 subtask 列表"""
     context = runtime.context
+    logger.info(f"[intent_decomposer_node] thread_id: {context.thread_id}")
+
     llm = context.reasoning_llm
     max_clarification_count = context.max_clarification_count
     max_history_task_count = context.max_history_task_count
     max_search_loop = context.max_search_loop
 
-    # 1. 意图识别：购物、平台规则、闲聊，并提取槽位
     subtasks = state.get("sub_tasks", [])
-    # 过滤：只发送最近的 N 个未完成的活跃子任务
     filtered_subtasks = _filter_active_subtasks(subtasks, max_count=max_history_task_count)
-    # 意图分析，传入重写后的 query
     intent_resp = await intent_analyze(llm, state.get("rewritten_query", ""), filtered_subtasks)
-    logger.info(f"thread_id: {context.thread_id}, 意图识别结果：{intent_resp}")
 
     # 2. 处理每个意图项
     for intent_item in intent_resp.intent_items:
+        logger.info(f"【意图识别结果】- {intent_item}")
         # 判断是新的意图还是旧的意图
         is_new, matched_subtask = is_new_intent(intent_item, subtasks)
         current_subtask = matched_subtask
@@ -173,7 +172,6 @@ def _handle_clarification(subtask: SubTask, intent_item: IntentItem, max_clarifi
 
     # 达到最大澄清次数，强制执行
     if subtask.clarification_count >= max_clarification_count:
-        logger.warning(f"达到最大澄清次数 {max_clarification_count}，强制执行搜索")
         subtask.status = TaskStatus.READY
     else:
         # 继续澄清
@@ -187,7 +185,7 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
         - user_query: 根据历史消息重写过后的 query
         - subtasks: 历史的 SubTask 列表
     """
-    parser = JsonOutputParser(pydantic_object=IntentResponse)
+    parser = PydanticOutputParser(pydantic_object=IntentResponse)
 
     # 构建历史 subtasks 上下文
     history_context = ""
@@ -198,7 +196,7 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
             for task in shopping_tasks:
                 if isinstance(task, ShoppingSubTask):
                     history_context += f"- task_id: {task.task_id}\n"
-                    history_context += f"  original_query: {task.sub_query}\n"
+                    history_context += f"  sub_query: {task.sub_query}\n"
                     history_context += f"  product_category: {task.product_category}\n"
                     history_context += f"  keywords: {task.keywords}\n"
                     history_context += f"  filters: {task.filters}\n"
@@ -237,8 +235,8 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
     # Decomposition Rules (关键步骤)
     1. **原子化拆分**: 如果用户的一句话包含多个独立的需求（例如："我想买双鞋，另外问问怎么退货"），必须将其拆分为两个独立的 `IntentItem`。
        - 错误做法：将整句标记为 SHOPPING。
-       - 正确做法：生成两个 item: [{"sub_query": "我想买双鞋", "intent": "SHOPPING"}, {"sub_query": "怎么退货", "intent": "PLATFORM"}]。
-       - 再比如：用户说“给我推荐一只口红和一本小说”，生成两个 item，因为是两个购物请求，[{"sub_query": "我想买一只口红", "intent": "SHOPPING"}, {"sub_query": "我想买一本小说", "intent": "SHOPPING"}]。
+       - 正确做法：生成两个 item: [{{"sub_query": "我想买双鞋", "intent": "SHOPPING"}}, {{"sub_query": "怎么退货", "intent": "PLATFORM"}}]。
+       - 再比如：用户说“给我推荐一只口红和一本小说”，生成两个 item，因为是两个购物请求，[{{"sub_query": "我想买一只口红", "intent": "SHOPPING"}}, {{"sub_query": "我想买一本小说", "intent": "SHOPPING"}}]。
 
     2. **优先级与过滤**:
        - 如果用户输入纯属闲聊（多个子问题都是闲聊），只返回一个 CHITCHAT 类型的 item。
@@ -281,7 +279,7 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
     - 对于 COMPARISON 类型，`is_new` 固定为 true，`matched_task_id` 为匹配到的 ShoppingSubTask 的 task_id，`extracted_slots` 为空字典。
     - `extracted_slots` 字段必须包含：product_category, keywords, filters（SHOPPING 意图）。
     - `explicit_search` 字段表示用户是否明确表示要立即搜索商品：
-      - explicit_search=true：用户说"搜一下"、"就这个了"、"差不多就行"、"随便、任意"
+      - explicit_search=true：用户说"搜一下"、"款式随意"、"差不多就行"、"直接推荐吧"、"不知道要什么，直接搜索吧"
       - explicit_search=false：用户只是继续描述需求，如"推荐一款"、"要拍照好看的"、"有没有..."
     - `is_replace_products` 字段表示用户是否要求"换一批"：
       - is_replace_products=true：用户明确说"换一批"、"换一个"、"再看看其他的"
@@ -293,53 +291,53 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
     ## 示例1：多意图拆分（新意图，需要澄清）
     User: "推荐几款降噪耳机，顺便问问京东白条怎么开通？"
     Assistant:
-    {
+    {{
       "intent_items": [
-        {
+        {{
           "sub_query": "推荐几款降噪耳机",
           "intent": "SHOPPING",
           "is_new": true,
           "matched_task_id": null,
-          "extracted_slots": {
+          "extracted_slots": {{
             "product_category": "降噪耳机",
             "keywords": [],
-            "filters": {}
-          },
+            "filters": {{}}
+          }},
           "explicit_search": false,
           "is_replace_products": false
-        },
-        {
+        }},
+        {{
           "sub_query": "京东白条怎么开通",
           "intent": "PLATFORM",
           "is_new": true,
           "matched_task_id": null,
-          "extracted_slots": {},
+          "extracted_slots": {{}},
           "explicit_search": false,
           "is_replace_products": false
-        }
+        }}
       ]
-    }
+    }}
 
     ## 示例2：明确触发搜索
     User: "帮我搜一下降噪耳机，要索尼的"
     Assistant:
-    {
+    {{
       "intent_items": [
-        {
+        {{
           "sub_query": "帮我搜一下降噪耳机，要索尼的",
           "intent": "SHOPPING",
           "is_new": true,
           "matched_task_id": null,
-          "extracted_slots": {
+          "extracted_slots": {{
             "product_category": "降噪耳机",
             "keywords": ["索尼"],
-            "filters": {}
-          },
+            "filters": {{}}
+          }},
           "explicit_search": true,
           "is_replace_products": false
-        }
+        }}
       ]
-    }
+    }}
 
     ## 示例3：旧意图 - 增加价格条件，但不想搜索
     User: "我的预算是300元钱。"
@@ -348,26 +346,26 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
       original_query: 推荐几款降噪耳机
       product_category: 降噪耳机
       keywords: []
-      filters: {}
+      filters: {{}}
       clarification_count: 0
     Assistant:
-    {
+    {{
       "intent_items": [
-        {
+        {{
           "sub_query": "我的预算是300元钱",
           "intent": "SHOPPING",
           "is_new": false,
           "matched_task_id": "task_001",
-          "extracted_slots": {
+          "extracted_slots": {{
             "product_category": "降噪耳机",
             "keywords": [],
-            "filters": {"price_max": 3000}
-          },
+            "filters": {{"price_max": 3000}}
+          }},
           "explicit_search": false,
           "is_replace_products": false
-        }
+        }}
       ]
-    }
+    }}
 
     ## 示例4：旧意图 - 替换颜色（完整关键词）
     User: "换成红色的。"
@@ -376,26 +374,26 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
       original_query: 推荐几款口红
       product_category: 口红
       keywords: []
-      filters: {}
+      filters: {{}}
       clarification_count: 0
     Assistant:
-    {
+    {{
       "intent_items": [
-        {
+        {{
           "sub_query": "换成红色的",
           "intent": "SHOPPING",
           "is_new": false,
           "matched_task_id": "task_002",
-          "extracted_slots": {
+          "extracted_slots": {{
             "product_category": "口红",
             "keywords": ["红色"],
-            "filters": {}
-          },
+            "filters": {{}}
+          }},
           "explicit_search": false,
           "is_replace_products": false
-        }
+        }}
       ]
-    }
+    }}
 
     ## 示例5：旧意图 - 增量添加关键词（完整列表）
     User: "要拍照好看的。"
@@ -404,26 +402,26 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
       original_query: 推荐几款手机
       product_category: 手机
       keywords: []
-      filters: {}
+      filters: {{}}
       clarification_count: 0
     Assistant:
-    {
+    {{
       "intent_items": [
-        {
+        {{
           "sub_query": "要拍照好看的",
           "intent": "SHOPPING",
           "is_new": false,
           "matched_task_id": "task_003",
-          "extracted_slots": {
+          "extracted_slots": {{
             "product_category": "手机",
             "keywords": ["拍照好看"],
-            "filters": {}
-          },
+            "filters": {{}}
+          }},
           "explicit_search": false,
           "is_replace_products": false
-        }
+        }}
       ]
-    }
+    }}
 
     ## 示例6：关键示例 - 替换颜色但保留之前的关键词（完整列表）
     User: "换成黑色的，不要红色的。"
@@ -432,26 +430,26 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
       original_query: 续航久、拍照好看的红色手机
       product_category: 手机
       keywords: ["续航久", "拍照好看", "红色"]
-      filters: {}
+      filters: {{}}
       clarification_count: 0
     Assistant:
-    {
+    {{
       "intent_items": [
-        {
+        {{
           "sub_query": "换成黑色的，不要红色的",
           "intent": "SHOPPING",
           "is_new": false,
           "matched_task_id": "task_004",
-          "extracted_slots": {
+          "extracted_slots": {{
             "product_category": "手机",
             "keywords": ["续航久", "拍照好看", "黑色"],
-            "filters": {}
-          },
+            "filters": {{}}
+          }},
           "explicit_search": false,
           "is_replace_products": false
-        }
+        }}
       ]
-    }
+    }}
 
     ## 示例7：换一批 - 继续浏览更多商品
     User: "再看看其他的。"
@@ -460,26 +458,26 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
       original_query: 推荐几款降噪耳机
       product_category: 降噪耳机
       keywords: ["索尼"]
-      filters: {}
+      filters: {{}}
       clarification_count: 0
     Assistant:
-    {
+    {{
       "intent_items": [
-        {
+        {{
           "sub_query": "再看看其他的",
           "intent": "SHOPPING",
           "is_new": false,
           "matched_task_id": "task_001",
-          "extracted_slots": {
+          "extracted_slots": {{
             "product_category": "降噪耳机",
             "keywords": [],
-            "filters": {}
-          },
+            "filters": {{}}
+          }},
           "explicit_search": false,
           "is_replace_products": true
-        }
+        }}
       ]
-    }
+    }}
 
     ## 示例8：新意图 - 新品类
     User: "我想买个键盘。"
@@ -488,71 +486,71 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
       original_query: 推荐几款降噪耳机
       product_category: 降噪耳机
     Assistant:
-    {
+    {{
       "intent_items": [
-        {
+        {{
           "sub_query": "我想买个键盘",
           "intent": "SHOPPING",
           "is_new": true,
           "matched_task_id": null,
-          "extracted_slots": {
+          "extracted_slots": {{
             "product_category": "键盘",
             "keywords": [],
-            "filters": {}
-          },
+            "filters": {{}}
+          }},
           "explicit_search": false,
           "is_replace_products": false
-        }
+        }}
       ]
-    }
+    }}
 
     ## 示例9：闲聊
     User: "你好呀，今天天气不错"
     Assistant:
-    {
+    {{
       "intent_items": [
-        {
+        {{
           "sub_query": "你好呀，今天天气不错",
           "intent": "CHITCHAT",
           "is_new": true,
           "matched_task_id": null,
-          "extracted_slots": {},
+          "extracted_slots": {{}},
           "is_replace_products": false
-        }
+        }}
       ]
-    }
+    }}
 
     ## 示例10：品牌级比较 - 走 CHITCHAT
     User: "华为和iPhone选哪个好？"
     Assistant:
-    {
+    {{
       "intent_items": [
-        {
+        {{
           "sub_query": "华为和iPhone选哪个好？",
           "intent": "CHITCHAT",
           "is_new": true,
           "matched_task_id": null,
-          "extracted_slots": {},
+          "extracted_slots": {{}},
           "is_replace_products": false
-        }
+        }}
       ]
-    }
+    }}
 
     ## 示例11：泛泛的选择讨论 - 走 CHITCHAT
     User: "休闲裤还是工装裤好看？"
     Assistant:
-    {
+    {{
       "intent_items": [
-        {
+        {{
           "sub_query": "休闲裤还是工装裤好看？",
           "intent": "CHITCHAT",
           "is_new": true,
           "matched_task_id": null,
-          "extracted_slots": {},
+          "extracted_slots": {{}},
           "is_replace_products": false
-        }
+        }}
       ]
-    }
+    }}
 
     ## 示例12：商品比较 - 走 COMPARISON（有代词 + 有推荐商品）
     User: "这几个有什么区别？"
@@ -561,38 +559,38 @@ async def intent_analyze(llm, user_query: str, subtasks: list[SubTask]) -> Inten
       original_query: 推荐几款电脑
       product_category: 电脑
       keywords: []
-      filters: {}
+      filters: {{}}
       has_recommended_product_ids: [1001, 1002, 1003]
       clarification_count: 0
     Assistant:
-    {
+    {{
       "intent_items": [
-        {
+        {{
           "sub_query": "这几个有什么区别？",
           "intent": "COMPARISON",
           "is_new": true,
           "matched_task_id": "task_001",
-          "extracted_slots": {},
+          "extracted_slots": {{}},
           "is_replace_products": false
-        }
+        }}
       ]
-    }
+    }}
 
     ## 示例13：购物感受 - 走 CHITCHAT
     User: "这件商品不错"
     Assistant:
-    {
+    {{
       "intent_items": [
-        {
+        {{
           "sub_query": "这件商品不错",
           "intent": "CHITCHAT",
           "is_new": true,
           "matched_task_id": null,
-          "extracted_slots": {},
+          "extracted_slots": {{}},
           "is_replace_products": false
-        }
+        }}
       ]
-    }
+    }}
 
     # Historical Shopping Subtasks
     {history_context}

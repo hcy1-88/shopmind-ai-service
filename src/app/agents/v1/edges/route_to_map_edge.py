@@ -5,19 +5,19 @@
 @Time       : 2026/3/23 1:56
 @Author     : hcy18
 """
+from langgraph.runtime import Runtime
 from langgraph.types import Send
-
-from app.agents.v1.schema import ShopmindAgentState, ShopmindAssistantContext, IntentCategory
+from app.agents.v1.schema import ShopmindAgentState, IntentCategory, ShopmindAssistantContext
 from app.utils.logger import app_logger as logger
 
-async def route_to_map_node_edge(state: ShopmindAgentState, context: ShopmindAssistantContext):
+def route_to_map_node_edge(state: ShopmindAgentState, runtime: Runtime[ShopmindAssistantContext]) -> list[Send]:
     """
     MapReduce 路由函数
     """
-    thread_id = context.thread_id
+    thread_id = runtime.context.thread_id
+    logger.info(f"[route_to_map_node_edge] thread_id: {thread_id}")
+
     current_tasks = state.get("current_tasks", [])
-    logger.info(f"用户 query：{state.get('original_query')}, thread_id:{thread_id}, current_tasks :{current_tasks}")
-    # 构造 send 列表
     send_list = []
     for task in current_tasks:
         if task.category == IntentCategory.SHOPPING:

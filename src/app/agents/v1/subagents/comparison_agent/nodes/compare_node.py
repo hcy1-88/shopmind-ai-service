@@ -5,12 +5,10 @@
 @Time       : 2026/3/27
 @Author     : hcy18
 """
-from typing import Any
-
 from langchain_core.messages import SystemMessage, HumanMessage
+from langgraph.runtime import Runtime
 
 from app.agents.v1.schema import ComparisonSubTask, TaskStatus, ShopmindAssistantContext
-from app.services import llm_service
 from app.utils.logger import app_logger as logger
 
 
@@ -47,7 +45,7 @@ COMPARISON_SYSTEM_PROMPT = """你是一个专业的电商导购助手，正在�
 """
 
 
-async def compare_node(state: dict, context: ShopmindAssistantContext) -> dict:
+async def compare_node(state: dict, runtime: Runtime[ShopmindAssistantContext]) -> dict:
     """
     商品比较节点 - 生成对比文案和购买建议
 
@@ -62,7 +60,7 @@ async def compare_node(state: dict, context: ShopmindAssistantContext) -> dict:
     task: ComparisonSubTask = state.get("task")
     product_details = state.get("product_details", [])
 
-    logger.info(f"[CompareNode] task_id: {task.task_id}, product_count: {len(product_details)}")
+    logger.info(f"[compare_node] task_id: {task.task_id}")
 
     if not product_details:
         task.final_response = "没有找到要比较的商品信息"
@@ -82,7 +80,7 @@ async def compare_node(state: dict, context: ShopmindAssistantContext) -> dict:
 请根据以上商品详情，生成对比文案和购买建议。"""
 
     # 调用 LLM 生成对比文案
-    llm = context.llm
+    llm = runtime.context.llm
     response = await llm.ainvoke([
         SystemMessage(content=COMPARISON_SYSTEM_PROMPT),
         HumanMessage(content=user_prompt)
@@ -90,8 +88,5 @@ async def compare_node(state: dict, context: ShopmindAssistantContext) -> dict:
 
     # 设置 final_response
     task.final_response = response.content.strip()
-    task.status = TaskStatus.COMPLETED
-
-    logger.info(f"[CompareNode] Comparison complete, response length: {len(task.final_response)}")
 
     return {"task": task}

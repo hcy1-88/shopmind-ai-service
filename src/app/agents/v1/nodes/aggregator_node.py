@@ -5,7 +5,7 @@
 @Time       : 2026/3/23 17:10
 @Author     : hcy18
 """
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langgraph.runtime import Runtime
 from app.agents.v1.schema import ShopmindAgentState, ShopmindAssistantContext
 from app.utils.logger import app_logger as logger
@@ -23,14 +23,11 @@ async def aggregate_node(state: ShopmindAgentState, runtime: Runtime[ShopmindAss
     此聚合器节点，负责把三者的 final_response 整合成一个连贯的答案，返回给用户。
     """
     context = runtime.context
-    llm = context.llm
-    thread_id = context.thread_id
-    logger.info(f"[AggregateNode] thread_id: {thread_id}")
+    logger.info(f"[aggregator_node] thread_id: {context.thread_id}")
 
-    # 获取所有子任务的 final_response
+    llm = context.llm
     sub_task_results = state.get("sub_task_results", [])
 
-    # 收集有 final_response 的任务响应
     task_responses = []
     for task in sub_task_results:
         if task.final_response:
@@ -41,20 +38,13 @@ async def aggregate_node(state: ShopmindAgentState, runtime: Runtime[ShopmindAss
             })
 
     if not task_responses:
-        return {"answer": "抱歉，暂时无法处理您的请求。", "streaming_started": False}
+        answer = "抱歉，暂时无法处理您的请求。"
+        return {"answer": answer, "messages": [AIMessage(content=answer)], "sub_task_results": ["__CLEAR__"]}
 
-    # 构建聚合 prompt
-    if len(task_responses) == 1:
-        # 只有一个响应，直接返回，无 LLM 调用，不走流式
-        answer = task_responses[0]["response"]
-        logger.info(f"[AggregateNode] thread_id: {thread_id}, answer length: {len(answer)}")
-        return {"answer": answer, "is_replace_products": False, "streaming_started": False}
-    else:
-        # 多个响应，调用 LLM 整合，流式输出
-        answer = await _generate_coherent_answer(llm, task_responses)
+    # 聚合回答
+    answer = await _generate_coherent_answer(llm, task_responses)
 
-    logger.info(f"[AggregateNode] thread_id: {thread_id}, answer length: {len(answer)}")
-    return {"answer": answer, "streaming_started": True}
+    return {"answer": answer, "messages": [AIMessage(content=answer)], "sub_task_results": ["__CLEAR__"]}
 
 
 async def _generate_coherent_answer(llm, task_responses: list[dict]) -> str:
@@ -101,5 +91,5 @@ async def _generate_coherent_answer(llm, task_responses: list[dict]) -> str:
         HumanMessage(content=user_prompt),
     ]
 
-    response = await llm.ainvoke(messages)
+    response = await llm.with_config({"tags": ["final_answer"]}).ainvoke(messages)
     return response.content.strip()

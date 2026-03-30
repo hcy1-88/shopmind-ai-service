@@ -25,16 +25,14 @@ async def query_rewritten_node(state: ShopmindAgentState, runtime: Runtime[Shopm
     注意：多意图拆分由下一个意图分解节点处理
     """
     context = runtime.context
-    llm = context.llm
+    logger.info(f"[query_rewrite_node] thread_id: {context.thread_id}")
 
-    # 获取历史消息（用于指代消除和信息补全）
+    llm = context.llm
     messages = state.get("messages", [])
     history_text = build_history_context(messages)
-
-    # 调用 LLM 进行查询重写
     rewritten_query = await query_rewrite(llm, state.get("original_query", ""), history_text)
-    logger.info(f"thread_id: {context.thread_id}, 查询重写结果: {rewritten_query}")
 
+    logger.info(f"[query_rewrite_node] thread_id: {context.thread_id}, rewritten_query: {rewritten_query}")
     return {"rewritten_query": rewritten_query}
 
 
@@ -54,8 +52,9 @@ async def query_rewrite(
     # 核心任务
     1. **指代消除**: 将模糊的指代（如"这个"、"那个"、"东西"、"便宜的"、"换一个"）替换为具体的商品品类或属性
     2. **信息补全**: 结合历史对话，补全用户未明确说明但隐含的信息
-    3. **保持原样**: 如果没有问题需要重写（如首次提问），则保持原样
+    3. **保持原样**: 如果没有问题需要重写（如首次提问），则保持原样；
     4. **多个子问题**: 用户问题如果包含多个子问题，则每个子问题都要分别重写
+    5. **保持提问气质**: 如果用户确实在提问，你需要在信息补全后，保持提问的句式和语气，而不是把问句变成陈述句
 
     # 重写规则
     1. 指代词必须替换为具体的商品品类或之前提到的商品
@@ -66,15 +65,21 @@ async def query_rewrite(
 
     ## 示例1：指代消除
     User: "这个有便宜点的吗？"
-    History: 用户: 推荐一款拍照好看的手机
+    History: 用户: 推荐一款拍照好看的手机，款式随便
             助手: 为您推荐...
     Output: 拍照好看的手机中便宜的选择
 
     ## 示例2：信息补全
-    User: "预算300元以内的"
+    User: "预算300元以内"
     History: 用户: 推荐几款口红
-            助手: 为您推荐...
+            助手: 您的预算多少？
     Output: 300元以内的口红
+    
+    ## 示例3：信息补全
+    User: "随便"
+    History: 用户: 推荐几款口红
+            助手: 你想要什么用的款式...
+    Output: 推荐几款口红, 款式随便
 
     ## 示例3：指代替换 + 属性补充
     User: "换成蓝色的"
@@ -113,8 +118,6 @@ async def query_rewrite(
     ## 历史对话
     {history_context}
 
-    ## 用户当前问题
-    {user_query}
 
     # Output 要求
     - 直接输出重写后的查询文本，不要包含任何解释、JSON 或其他格式
@@ -123,7 +126,7 @@ async def query_rewrite(
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", QUERY_REWRITE_PROMPT),
-        ("human", "{user_input}")
+        ("human", "用户问题：{user_input}")
     ])
     prompt = prompt.partial(
         history_context=history_context,

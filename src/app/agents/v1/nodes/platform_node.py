@@ -31,21 +31,16 @@ async def platform_node(state: PlatformNodeState, runtime: Runtime[ShopmindAssis
         dict - 包含更新后的 sub_task
     """
     context = runtime.context
-    llm = context.llm
-    sub_task: PlatformSubTask = state.sub_task
-    messages = state.messages
+    logger.info(f"[platform_node] thread_id: {context.thread_id}")
 
-    thread_id = context.thread_id
+    llm = context.llm
+    sub_task: PlatformSubTask = state["sub_task"]
+    messages = state["messages"]
     query = sub_task.sub_query
     history_text = build_history_context(messages)
-    logger.info(f"[PlatformNode] thread_id: {thread_id}, query: {query}, history: {history_text[:100]}...")
 
     try:
-        # Step 1: 调用 platform_knowledge_search 工具检索知识库
         search_result = platform_knowledge_search.invoke(query)
-        logger.info(f"[PlatformNode] 知识库检索结果: {search_result[:200] if len(search_result) > 200 else search_result}...")
-
-        # Step 2: 使用 LLM 基于检索结果和历史上下文生成自然语言回答
         prompt = f"""你是一个电商平台的客服助手。请根据以下信息，用自然语言回答用户的问题。
 
 ## 历史对话上下文
@@ -67,13 +62,11 @@ async def platform_node(state: PlatformNodeState, runtime: Runtime[ShopmindAssis
         response = await llm.ainvoke([HumanMessage(content=prompt)])
         final_response = response.content.strip()
 
-        # Step 3: 更新 sub_task
         sub_task.final_response = final_response
         sub_task.status = TaskStatus.COMPLETED
-        logger.info(f"[PlatformNode] 完成，final_response: {final_response[:100]}...")
 
     except Exception as e:
-        logger.error(f"[PlatformNode] 执行失败: {e}", exc_info=True)
+        logger.error(f"[platform_node] 执行失败: {e}", exc_info=True)
         sub_task.status = TaskStatus.FAILED
         sub_task.final_response = f"处理平台规则查询时发生错误: {str(e)}"
 

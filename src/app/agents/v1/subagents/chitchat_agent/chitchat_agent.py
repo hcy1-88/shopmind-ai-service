@@ -8,7 +8,7 @@
 from typing import Optional
 
 from langchain.agents import create_agent
-from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.messages import BaseMessage
 from langgraph.types import RunnableConfig
 
 from app.agents.v1.schema import ShopmindAssistantContext
@@ -18,7 +18,10 @@ from app.tools.chat_tool import tavily_search, get_current_weather, get_forecast
 from app.utils.logger import app_logger as logger
 
 
-CHITCHAT_PROMPT = """你是一个友好、热情的闲聊助手，名字叫「小购」。
+CHITCHAT_PROMPT = """你是一个友好、热情的导购助手，名字叫「小购」。
+
+## 你的任务
+负责和用户闲聊聊天，不过要能在恰当的时机，巧妙地把话题拉回到购物上，因为你是导购助手，期望达成平台交易。
 
 ## 你的能力
 1. **联网搜索**：可以搜索网络上最新信息来回答问题
@@ -27,7 +30,7 @@ CHITCHAT_PROMPT = """你是一个友好、热情的闲聊助手，名字叫「�
 
 ## 回答风格
 - 语言自然、亲切、简洁
-- 结合对话历史上下文理解用户意图
+- 结合对话历史上下文理解用户意图，重要信息不清楚就要问
 - 主动使用工具获取实时信息（天气、新闻等）
 - 如果用户询问实时信息，主动调用相应工具
 
@@ -71,8 +74,8 @@ class ChitChatService:
         处理闲聊查询
 
         Args:
-            query: 用户查询
-            messages: 对话历史
+            query: 用户查询（sub_query，重写后的子问题）
+            messages: 对话历史（已包含原始 HumanMessage）
             thread_id: 用于 checkpoint 的线程 ID
 
         Returns:
@@ -81,16 +84,12 @@ class ChitChatService:
         try:
             logger.info(f"[ChitChatService] 处理闲聊: {query[:50]}...")
 
-            # 构建带历史上下文的输入
-            history_text = build_history_context(messages)
-            if history_text != "无历史消息":
-                full_input = f"## 对话历史\n{history_text}\n\n## 当前问题\n{query}"
-            else:
-                full_input = query
+            # messages 已包含原始 HumanMessage，直接使用
+            # query（sub_query）是 LLM 重写后的版本，作为当前轮次的追加消息
+            # 但注意：原始 query 已存在于 messages 中，不能重复追加
+            # 因此直接传入 messages，agent 会自动处理
 
-            # 调用 agent，传入 thread_id 以支持 checkpoint
-            config = RunnableConfig(configurable={"thread_id": thread_id})
-            result = await self.agent.ainvoke({"messages": [HumanMessage(content=full_input)]}, config=config)
+            result = await self.agent.ainvoke({"messages": messages})
             resp = result["messages"][-1].content
             logger.info(f"[ChitChatService] 完成: {resp[:50]}...")
             return resp
@@ -99,17 +98,16 @@ class ChitChatService:
             logger.error(f"[ChitChatService] 失败: {e}", exc_info=True)
             return f"抱歉，处理您的问题时遇到了问题: {str(e)}"
 
-    def build_chitchat_agent(self, checkpointer):
+    def build_chitchat_agent(self):
         # 工具列表
         tools = [tavily_search, get_current_weather, get_forecast_weather]
         logger.info(f"[ChitChatService] 初始化中，工具数量: {len(tools)}")
 
-        # 创建 ReAct Agent
+        # 创建 ReAct Agent（不使用 checkpointer，对话历史通过输入消息注入）
         self.agent = create_agent(
             self.llm,
             tools=tools,
             system_prompt=CHITCHAT_PROMPT,
-            checkpointer=checkpointer,
         )
 
         logger.info("[ChitChatService] 初始化完成")

@@ -1,19 +1,20 @@
 """生成节点"""
 
-from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage, AIMessage
+from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage
+from langgraph.runtime import Runtime
 
-from app.agents.v1.schema import SearchingSubgraphState, ShopmindAssistantContext
+from app.agents.v1.schema import SearchingSubgraphState, ShopmindAssistantContext, TaskStatus
 from app.schemas.product_response_schema import ProductResponseDto
 from app.utils.logger import app_logger as logger
 
 
-async def generate_node(state: SearchingSubgraphState, context: ShopmindAssistantContext):
+async def generate_node(state: SearchingSubgraphState, runtime: Runtime[ShopmindAssistantContext]):
     """基于过滤后的商品生成最终推荐文案"""
     task = state["task"]
     subgraph_messages: list[BaseMessage] = state.get("subgraph_messages", [])
-    llm = context.llm
-    thread_id = context.thread_id
-    logger.info(f"[GenerateNode] thread_id: {thread_id}, task_id: {task.task_id}")
+    llm = runtime.context.llm
+    thread_id = runtime.context.thread_id
+    logger.info(f"[generate_node] thread_id: {thread_id}, task_id: {task.task_id}")
     # 构建 generate_system_msg
     generate_system_msg = """你是一个电商导购助手，正在为用户推荐商品。
 
@@ -76,14 +77,15 @@ async def generate_node(state: SearchingSubgraphState, context: ShopmindAssistan
 
     # 设置 final_response
     task.final_response = response.content.strip()
+    task.status = TaskStatus.WAITING
 
     # 重置"换一批"
     task.is_replace_products = False
 
     return {
         "subgraph_messages": [],
-        "searched_res": [],
-        "searched_details": [],
+        "searched_res": ["__CLEAR__"],
+        "searched_details": ["__CLEAR__"],
         "filtered_product_ids": [],
         "product_after_filter": [],
         "search_count_loop": 0,

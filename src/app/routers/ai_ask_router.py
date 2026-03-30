@@ -54,7 +54,7 @@ async def chat(request: AIAskRequest):
         # 返回流式响应
         return StreamingResponse(
             chat_service.chat_stream(request),
-            media_type="text/plain; charset=utf-8"
+            media_type="text/event-stream; charset=utf-8"
         )
         
     except Exception as e:

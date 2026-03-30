@@ -21,17 +21,14 @@ async def comparison_subgraph_node(state: ComparisonNodeState, runtime: Runtime[
     ComparisonSubTask.product_ids 已包含待比较的商品ID列表
     """
     task: ComparisonSubTask = state["sub_task"]
+    logger.info(f"[comparison_subgraph_node] task_id: {task.task_id}")
+
     product_ids = task.product_ids or []
-
-    logger.info(f"[ComparisonSubgraphNode] task_id: {task.task_id}, product_ids: {product_ids}")
-
     if not product_ids:
-        logger.warning(f"[ComparisonSubgraphNode] No product_ids to compare")
         task.final_response = "没有选择要比较的商品"
-        task.status = TaskStatus.COMPLETED
+        task.status = TaskStatus.WAITING
         return {"sub_task_results": [task]}
 
-    # 构建子图状态
     comparison_state = {
         "task": task,
         "product_ids": product_ids,
@@ -39,19 +36,16 @@ async def comparison_subgraph_node(state: ComparisonNodeState, runtime: Runtime[
         "subgraph_messages": []
     }
 
-    # 获取子图
     comparison_subgraph = ComparisonSubgraph.get_instance().get_graph()
-
-    # 使用 task_id 作为 thread_id，支持 checkpoint
     config = RunnableConfig(configurable={"thread_id": f"comparison_{task.task_id}"})
 
-    # 调用子图
     try:
-        comparison_output = comparison_subgraph.invoke(comparison_state, context=runtime.context, config=config)
+        comparison_output = await comparison_subgraph.ainvoke(comparison_state, context=runtime.context, config=config)
+        task.status = TaskStatus.COMPLETED
         result_task = comparison_output.get("task", task)
         return {"sub_task_results": [result_task]}
     except Exception as e:
-        logger.error(f"[ComparisonSubgraphNode] Subgraph execution failed: {e}", exc_info=True)
+        logger.error(f"[comparison_subgraph_node] 执行失败: {e}", exc_info=True)
         task.final_response = f"商品比较失败: {str(e)}"
         task.status = TaskStatus.FAILED
         return {"sub_task_results": [task]}

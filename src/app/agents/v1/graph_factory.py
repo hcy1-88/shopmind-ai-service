@@ -42,7 +42,7 @@ class GraphFactory:
         shopping_subgraph = cls._build_shopping_subgraph(checkpointer)
 
         # 2. 获取 ChitChatService 单例
-        chitchat_agent = cls._build_chitchat_agent(checkpointer)
+        chitchat_agent = cls._build_chitchat_agent()
 
         # 3. 构建 ComparisonSubgraph
         comparison_subgraph = cls._build_comparison_subgraph(checkpointer)
@@ -70,7 +70,7 @@ class GraphFactory:
         return shopping_subgraph
 
     @classmethod
-    def _build_chitchat_agent(cls, checkpointer: BaseCheckpointSaver) -> ChitChatService:
+    def _build_chitchat_agent(cls) -> ChitChatService:
         """
         构建 ChitChatService Agent
 
@@ -78,7 +78,7 @@ class GraphFactory:
             ChitChatService 单例
         """
         chitchat_agent = ChitChatService.get_instance()
-        chitchat_agent.build_chitchat_agent(checkpointer)
+        chitchat_agent.build_chitchat_agent()
         logger.info("ChitChatService 构建完成")
         return chitchat_agent
 

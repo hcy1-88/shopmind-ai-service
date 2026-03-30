@@ -1,22 +1,22 @@
 """过滤节点"""
 
-from langchain_core.messages import BaseMessage
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
+from langgraph.runtime import Runtime
 
 from app.agents.v1.schema import ShoppingSubTask, SearchingSubgraphState, ShopmindAssistantContext, FilterResult
 from app.schemas.product_response_schema import ProductResponseDto
 from app.utils.logger import app_logger as logger
 
 
-async def filter_node(state: SearchingSubgraphState, context: ShopmindAssistantContext):
+async def filter_node(state: SearchingSubgraphState, runtime: Runtime[ShopmindAssistantContext]):
     """对工具搜索结果进行 LLM 语义过滤，并更新 has_searched_product_id"""
     task: ShoppingSubTask = state["task"]
     searched_details: list[ProductResponseDto] = state.get("searched_details", [])
-    llm = context.reasoning_llm
-    thread_id = context.thread_id
+    llm = runtime.context.reasoning_llm
+    thread_id = runtime.context.thread_id
 
-    logger.info(f"[FilterNode] thread_id: {thread_id}, task_id: {task.task_id}, is_replace_products={task.is_replace_products}")
+    logger.info(f"[filter_node] thread_id: {thread_id}, task_id: {task.task_id}")
 
     # 如果没有搜索到任何商品
     if not searched_details:
@@ -77,7 +77,6 @@ async def filter_node(state: SearchingSubgraphState, context: ShopmindAssistantC
     result: FilterResult = await chain.ainvoke({
         "filters": filters,
     })
-    logger.info(f"[FilterNode] result: {result}")
 
     # 填充 product_after_filter：从 searched_details 中过滤出保留的商品详情
     product_after_filter = [

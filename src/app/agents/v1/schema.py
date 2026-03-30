@@ -21,6 +21,38 @@ from langchain_core.messages import BaseMessage
 from pydantic import BaseModel, Field
 
 
+# ======================= Reducer Functions =======================
+
+def merge_subtasks(existing: list["SubTask"], new: list["SubTask"]) -> list["SubTask"]:
+    """按 task_id 合并，new 覆盖 existing；new 为空时保留 existing
+
+    用于 sub_tasks：确保历史任务在跨 turn 时不会丢失。
+    当 invoke() 传入 [] 时，保留 checkpoint 中的已有任务。
+    """
+    if not new:
+        return existing
+    merged = {t.task_id: t for t in existing}
+    for t in new:
+        merged[t.task_id] = t
+    return list(merged.values())
+
+
+def list_reducer_result(existing: list["SubTask"], new: list["SubTask"]) -> list["SubTask"]:
+    """sub_task_results 专用 reducer：
+    - new == [] 时：保留 existing（返回空结果，不清空）
+    - new == ["__CLEAR__"] 时：清空（aggregator_node 显式清空）
+    - 否则按 task_id 去重，new 覆盖 existing
+    """
+    if not new:
+        return existing
+    if new == ["__CLEAR__"]:
+        return []
+    merged = {t.task_id: t for t in existing}
+    for t in new:
+        merged[t.task_id] = t
+    return list(merged.values())
+
+
 class IntentCategory(str, Enum):
     SHOPPING = "SHOPPING"
     PLATFORM = "PLATFORM"
@@ -33,6 +65,7 @@ class TaskStatus(str, Enum):
     NEW        = "NEW"         # 刚创建
     CLARIFYING = "CLARIFYING"  # 信息不足，等待用户澄清
     READY      = "READY"       # 槽位齐全，可执行搜索
+    WAITING = "WAITING"    # 等待结束
     COMPLETED  = "COMPLETED"   # 执行完成，final_response 已生成
     FAILED     = "FAILED"      # 执行失败
 
@@ -109,37 +142,64 @@ class ShopmindAgentState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     original_query: str
     rewritten_query: str | None
-    sub_tasks: list[SubTask]
+    sub_tasks: Annotated[list[SubTask], merge_subtasks]
     current_tasks: list[SubTask]
     # 聚合器收集任务结果
-    sub_task_results: Annotated[list[SubTask], operator.add]
+    sub_task_results: Annotated[list[SubTask], list_reducer_result]
     # Agent 最终发送给用户的回复
     answer: str | None
-    streaming_started: bool
 
 
 ## 平台规则节点的状态
-class PlatformNodeState(BaseModel):
+class PlatformNodeState(TypedDict):
     sub_task: PlatformSubTask
     messages: Annotated[list[BaseMessage], add_messages]
 
 
 ## 闲聊节点的状态
-class ChitChatNodeState(BaseModel):
+class ChitChatNodeState(TypedDict):
     """闲聊节点状态"""
     sub_task: ChitchatSubTask
     messages: Annotated[list[BaseMessage], add_messages]
 
 
 ## shopping 节点的状态
-class ShoppingNodeState(BaseModel):
+class ShoppingNodeState(TypedDict):
     sub_task: ShoppingSubTask
     messages: Annotated[list[BaseMessage], add_messages]
 
 
-class ComparisonNodeState(BaseModel):
-    sub_task: ShoppingSubTask
+class ComparisonNodeState(TypedDict):
+    sub_task: ComparisonSubTask
     messages: Annotated[list[BaseMessage], add_messages]
+
+
+# ======================= 搜索子图 Reducer 函数 =================
+
+def merge_searched_res(existing: list[PageResult], new: list[PageResult]) -> list[PageResult]:
+    """searched_res 专用 reducer：
+    - new == [] 时：保留 existing（tool 返回空结果，不清空）
+    - new == ["__CLEAR__"] 时：清空（generate_node 显式重置）
+    - 否则：尾加
+    """
+    if not new:
+        return existing
+    if new == ["__CLEAR__"]:
+        return []
+    return existing + new
+
+
+def merge_searched_details(existing: list[ProductResponseDto], new: list[ProductResponseDto]) -> list[ProductResponseDto]:
+    """searched_details 专用 reducer：
+    - new == [] 时：保留 existing（tool 返回空结果，不清空）
+    - new == ["__CLEAR__"] 时：清空（generate_node 显式重置）
+    - 否则：尾加
+    """
+    if not new:
+        return existing
+    if new == ["__CLEAR__"]:
+        return []
+    return existing + new
 
 
 ## ======================= 搜索商品的子图状态 =================
@@ -149,9 +209,9 @@ class SearchingSubgraphState(TypedDict):
     # 子图消息
     subgraph_messages: Annotated[list[BaseMessage], add_messages]  # 子图的消息
     # 每次搜索后的结果
-    searched_res: Annotated[list[PageResult[list[ProductResponseDto]]], operator.add]
+    searched_res: Annotated[list[PageResult[list[ProductResponseDto]]], merge_searched_res]
     # 搜到到的商品详情
-    searched_details: Annotated[list[ProductResponseDto], operator.add]
+    searched_details: Annotated[list[ProductResponseDto], merge_searched_details]
 
     # LLM 语义过滤后需要保留的商品 ID 列表
     filtered_product_ids: list[int]
@@ -162,7 +222,7 @@ class SearchingSubgraphState(TypedDict):
     search_count_loop: int
 
     # 父子图的同名 key 是共享的
-    messages: Annotated[list[BaseMessage], operator.add]      # 父图的消息
+    messages: Annotated[list[BaseMessage], add_messages]      # 父图的消息
 
 
 class FilterResult(BaseModel):

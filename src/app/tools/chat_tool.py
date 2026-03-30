@@ -7,7 +7,6 @@
 """
 from typing import Annotated
 
-import httpx
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool, InjectedToolCallId
 from langchain_tavily import TavilySearch
@@ -21,6 +20,7 @@ from app.utils.logger import app_logger as logger
 from app.clients.product_service import get_product_service_client
 from app.schemas.product_response_schema import ProductResponseDto
 from app.services.rag_service import get_rag_service
+from app.tools.hefeng_token_provider import get_hefeng_token_provider
 
 
 # ========== Helper Functions ==========
@@ -32,10 +32,11 @@ def _get_tavily_api_key() -> str:
     return chat_config.get("tavily_api_key", "")
 
 
-def _get_hefeng_api_key() -> str:
-    """从 chat_config 获取和风天气 API Key"""
+def _get_hefeng_host() -> str:
+    """获取和风 api_host"""
     chat_config = get_nacos_client().get_chat_config()
-    return chat_config.get("hefeng_weather_api_key", "")
+    hefeng_cfg = chat_config.get("hefeng_weather", {})
+    return hefeng_cfg.get("api_host", "")
 
 
 async def _city_lookup(city: str) -> str | None:
@@ -48,19 +49,23 @@ async def _city_lookup(city: str) -> str | None:
     Returns:
         location_id 或 None（未找到）
     """
-    api_key = _get_hefeng_api_key()
-    if not api_key:
+    api_host = _get_hefeng_host()
+    if not api_host:
+        logger.error("[城市查询] 和风天气配置缺失：hefeng_weather_host")
         return None
 
-    url = f"https://geo.qweather.com/v2/city/lookup?location={city}&key={api_key}"
+    url = f"https://{api_host}/geo/v2/city/lookup?location={city}"
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, timeout=10.0)
-            data = response.json()
-            if data.get("code") == "200" and data.get("location"):
-                return data["location"][0].get("id")
+        token_provider = get_hefeng_token_provider()
+        response = await token_provider.request_with_auth(url, timeout=10.0)
+        data = response.json()
+        logger.info(f"[城市查询] 响应: {data}")
+        if data.get("code") == "200" and data.get("location"):
+            return data["location"][0].get("id")
+        else:
+            logger.warning(f"[城市查询] 城市未找到或 API 返回错误: city={city}, code={data.get('code')}, msg={data.get('msg')}")
     except Exception as e:
-        logger.error(f"[城市查询] 查询失败: {e}")
+        logger.error(f"[城市查询] 查询失败: city={city}, error={e}", exc_info=True)
     return None
 
 
@@ -228,9 +233,9 @@ async def get_current_weather(city: str) -> str:
     Returns:
         格式化后的天气信息，包含温度、湿度、风力等
     """
-    api_key = _get_hefeng_api_key()
-    if not api_key:
-        return "和风天气 API Key 未配置，请在 chat_config 中配置 hefeng_weather_api_key"
+    api_host = _get_hefeng_host()
+    if not api_host:
+        return "和风天气配置缺失，请在 chat_config 中配置 hefeng_weather_host"
 
     try:
         logger.info(f"[实时天气] 查询城市: {city}")
@@ -242,12 +247,14 @@ async def get_current_weather(city: str) -> str:
             return f"未找到城市 '{city}'，请确认城市名称是否正确"
 
         # Step 2: 查询实时天气
-        url = f"https://weather.qweather.com/v7/weather/now?location={location_id}&key={api_key}"
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, timeout=10.0)
-            data = response.json()
+        url = f"https://{api_host}/v7/weather/now?location={location_id}"
+        token_provider = get_hefeng_token_provider()
+        response = await token_provider.request_with_auth(url, timeout=10.0)
+        data = response.json()
+        logger.info(f"[实时天气] API 响应: city={city}, location_id={location_id}, response={data}")
 
         if data.get("code") != "200":
+            logger.warning(f"[实时天气] API 返回错误: city={city}, code={data.get('code')}, msg={data.get('msg')}")
             return f"查询天气失败: {data.get('msg', '未知错误')}"
 
         weather = data.get("now", {})
@@ -282,9 +289,9 @@ async def get_forecast_weather(city: str, days: int = 3) -> str:
     Returns:
         格式化后的天气预报信息
     """
-    api_key = _get_hefeng_api_key()
-    if not api_key:
-        return "和风天气 API Key 未配置，请在 chat_config 中配置 hefeng_weather_api_key"
+    api_host = _get_hefeng_host()
+    if not api_host:
+        return "和风天气配置缺失，请在 chat_config 中配置 hefeng_weather_host"
 
     if days < 3 or days > 30:
         return "预报天数必须在 3-30 天之间"
@@ -299,12 +306,14 @@ async def get_forecast_weather(city: str, days: int = 3) -> str:
             return f"未找到城市 '{city}'，请确认城市名称是否正确"
 
         # Step 2: 查询天气预报
-        url = f"https://weather.qweather.com/v7/weather/{days}d?location={location_id}&key={api_key}"
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, timeout=10.0)
-            data = response.json()
+        url = f"https://{api_host}/v7/weather/{days}d?location={location_id}"
+        token_provider = get_hefeng_token_provider()
+        response = await token_provider.request_with_auth(url, timeout=10.0)
+        data = response.json()
+        logger.info(f"[天气预报] API 响应: city={city}, days={days}, location_id={location_id}, response={data}")
 
         if data.get("code") != "200":
+            logger.warning(f"[天气预报] API 返回错误: city={city}, code={data.get('code')}, msg={data.get('msg')}")
             return f"查询天气失败: {data.get('msg', '未知错误')}"
 
         daily_list = data.get("daily", [])
