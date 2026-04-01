@@ -10,6 +10,7 @@ from langgraph.runtime import Runtime
 from app.agents.v1.schema import ShopmindAgentState, ShopmindAssistantContext
 from app.utils.logger import app_logger as logger
 
+FINAL_ANSWER_TAG = "final_answer"
 
 async def aggregate_node(state: ShopmindAgentState, runtime: Runtime[ShopmindAssistantContext]):
     """聚合多个子任务的响应，生成连贯的最终答案
@@ -91,5 +92,5 @@ async def _generate_coherent_answer(llm, task_responses: list[dict]) -> str:
         HumanMessage(content=user_prompt),
     ]
 
-    response = await llm.with_config({"tags": ["final_answer"]}).ainvoke(messages)
+    response = await llm.with_config({"tags": [FINAL_ANSWER_TAG]}).ainvoke(messages)
     return response.content.strip()

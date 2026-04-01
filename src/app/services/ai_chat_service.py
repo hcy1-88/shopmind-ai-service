@@ -4,6 +4,8 @@ import json
 from typing import AsyncGenerator, Optional
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
+
+from app.agents.v1.nodes.aggregator_node import FINAL_ANSWER_TAG
 from app.agents.v1.schema import ShopmindAssistantContext
 from app.agents.v1.graph_factory import GraphFactory
 from app.config.nacos_client import get_nacos_client
@@ -65,73 +67,30 @@ class AIChatService:
     # 内部 pipeline 节点，不向前端暴露 thinking 过程
     _INTERNAL_NODES = {"query_rewrite_node", "intent_decomposer_node"}
 
-    # 给前端展示的用户友好 Agent 节点语义映射
-    _NODE_MESSAGES = {
-        "intent_decomposer_node": "🎏 正在意图识别...",
-        "searching_subgraph_node": "🔍 正在全网检索匹配的商品...",
-        "tool_node": "🔍 正在执行商品搜索...",
-        "filter_node": "⚖️ 正在为您过滤劣质商品...",
-        "comparison_subgraph_node": "📊 正在对比这几款商品的优劣...",
-        "platform_node": "📖 正在查阅平台最新政策...",
-        "chitchat_node": "🧠 正在思考...",
-        "aggregator_node": "✍️ 正在整理最终回答...",
+    # 需要向前端展示的节点名称（这些节点会产生前端 UI 步骤）
+    _NODE_NAMES = {
+        "intent_decomposer_node",
+        "searching_subgraph_node",
+        "filter_node",
+        "comparison_subgraph_node",
+        "platform_node",
+        "chitchat_node",
+        "aggregator_node",
     }
 
-    # 给前端展示的用户友好工具语义映射（保留作为 fallback）
-    _TOOL_MESSAGES = {
+    # 需要向前端展示的工具名称（这些工具会产生前端 UI 工具气泡）
+    _TOOL_NAMES = {
         # 搜索类
-        "search_product": "🔍 正在为您搜索商品...",
-        "platform_knowledge_search": "📖 正在检索平台规则知识库...",
-        "tavily_search": "🌐 正在联网搜索最新资讯...",
+        "search_product",
+        "platform_knowledge_search",
+        "tavily_search",
         # 商品类
-        "get_new_product": "🆕 正在获取最新商品...",
-        "get_product_detail": "📦 正在查询商品详情...",
+        "get_new_product",
+        "get_product_detail",
         # 天气类
-        "get_current_weather": "🌤️ 正在查询当地实时天气...",
-        "get_forecast_weather": "🌤️ 正在查询天气预报...",
+        "get_current_weather",
+        "get_forecast_weather",
     }
-
-    @staticmethod
-    def _get_tool_start_message(tool_name: str, tool_args: dict) -> str:
-        """根据工具名和参数生成动态 start 消息"""
-        if tool_name == "get_forecast_weather":
-            city = tool_args.get("city", "未知城市")
-            days = tool_args.get("days", 3)
-            return f"🌤️ 正在查询{city}未来{days}天的天气预报..."
-        elif tool_name == "get_current_weather":
-            city = tool_args.get("city", "未知城市")
-            return f"🌤️ 正在查询{city}实时天气..."
-        elif tool_name == "search_product":
-            return f"🔍 正在为您搜索商品..."
-        elif tool_name == "get_product_detail":
-            return f"📦 正在查询商品详情..."
-        elif tool_name == "get_new_product":
-            limit = tool_args.get("limit", 3)
-            return f"🆕 正在获取最新商品 (limit={limit})..."
-        elif tool_name == "platform_knowledge_search":
-            query = tool_args.get("query", "")
-            query_short = query[:20] + "..." if len(query) > 20 else query
-            return f"📖 正在检索平台规则: {query_short}"
-        elif tool_name == "tavily_search":
-            query = tool_args.get("query", "")
-            query_short = query[:20] + "..." if len(query) > 20 else query
-            return f"🌐 正在联网搜索: {query_short}"
-        # Fallback
-        return AIChatService._TOOL_MESSAGES.get(tool_name, f"🔧 正在执行{tool_name}...")
-
-    @staticmethod
-    def _get_tool_end_message(tool_name: str) -> str:
-        """根据工具名生成 end 消息"""
-        end_messages = {
-            "get_forecast_weather": "✅ 天气预报查询完成",
-            "get_current_weather": "✅ 实时天气查询完成",
-            "search_product": "✅ 商品搜索完成",
-            "get_product_detail": "✅ 商品详情查询完成",
-            "get_new_product": "✅ 最新商品获取完成",
-            "platform_knowledge_search": "✅ 平台规则检索完成",
-            "tavily_search": "✅ 联网搜索完成",
-        }
-        return end_messages.get(tool_name, "✅ 操作完成")
 
     async def chat_stream(self, request: AIAskRequest) -> AsyncGenerator[str, None]:
         """
@@ -201,42 +160,33 @@ class AIChatService:
                 config=config,
                 version="v2",
             ):
-                kind = event["event"]
-                name = event.get("name", "")
+                kind = event["event"]                       # 事件类型
+                name = event.get("name", "")    # 事件名称
 
                 # 1. 拦截配置过的话术节点产生前端 UI 步骤气泡
-                if name in self._NODE_MESSAGES:
-                    msg = self._NODE_MESSAGES[name]
+                if name in self._NODE_NAMES:
                     if kind == "on_chain_start":
-                        sse_data = {"node_name": name, "message": msg, "status": "executing"}
-                        print(f"[DEBUG SSE] >>> thinking_start  data={sse_data}")
+                        sse_data = {"node_name": name,  "status": "executing"}
                         yield self._format_sse_event("thinking_start", sse_data)
                     elif kind == "on_chain_end":
-                        clean_msg = msg.replace('...', '')
-                        clean_msg = clean_msg.replace('正在', '')
-                        sse_data = {"node_name": name, "message": f"✅ {clean_msg}完成"}
-                        print(f"[DEBUG SSE] >>> thinking_end    data={sse_data}")
+                        sse_data = {"node_name": name, "status": "completed"}
                         yield self._format_sse_event("thinking_end", sse_data)
 
                 # 1.5 拦截配置过的工具产生前端 UI 工具气泡
-                elif name in self._TOOL_MESSAGES:
+                elif name in self._TOOL_NAMES:
                     if kind == "on_tool_start":
                         data_input = event.get("data", {}).get("input", {})
                         tool_args = {}
                         if isinstance(data_input, dict):
                             tool_args = {k: v for k, v in data_input.items() if k not in ["name", "id"]}
-                        msg = self._get_tool_start_message(name, tool_args)
-                        sse_data = {"tool_name": name, "tool_args": tool_args, "message": msg, "status": "executing"}
-                        print(f"[DEBUG SSE] >>> tool_start      data={sse_data}")
+                        sse_data = {"tool_name": name, "tool_args": tool_args, "status": "executing"}
                         yield self._format_sse_event("tool_start", sse_data)
                     elif kind == "on_tool_end":
-                        msg = self._get_tool_end_message(name)
-                        sse_data = {"tool_name": name, "message": msg}
-                        print(f"[DEBUG SSE] >>> tool_complete   data={sse_data}")
+                        sse_data = {"tool_name": name, "status": "completed"}
                         yield self._format_sse_event("tool_complete", sse_data)
 
                 # 2. 流式输出最终回答
-                elif kind == "on_chat_model_stream" and "final_answer" in event.get("tags", []):
+                elif kind == "on_chat_model_stream" and FINAL_ANSWER_TAG in event.get("tags", []):
                     chunk = event.get("data", {}).get("chunk", "")
                     if chunk:
                         content = ""
@@ -246,7 +196,6 @@ class AIChatService:
                             content = chunk
 
                         if content:
-                            has_streamed_answer = True
                             yield self._format_sse_event("token_stream", {
                                 "content": content,
                                 "node": name
@@ -265,11 +214,11 @@ class AIChatService:
             logger.error(f"流式对话失败: {e}", exc_info=True)
             # todo 但是无法存储到 messages 消息历史了
             yield self._format_sse_event("error", {"message": "抱歉，服务暂时不可用"})
-    
+
     def _format_sse_event(self, event_type: str, data: dict) -> str:
         """格式化 SSE 事件"""
         return f"data: {json.dumps({'type': event_type, 'data': data})}\n\n"
-    
+
     async def clear_history(self, session_id: str) -> bool:
         """
         清除对话历史
