@@ -227,7 +227,15 @@ class SearchingSubgraphState(TypedDict):
 
 class FilterResult(BaseModel):
     """filter_node 输出解析器使用的 Pydantic 模型"""
-    filtered_product_ids: list[int] = Field(description="过滤后需要保留的商品 ID 列表")
+    all_products_ids: list[int | str] = Field(
+        default_factory=list,
+        description="过滤前所有的商品 ID 列表（商品 id 可能是整数或字符串）",
+    )
+    filtered_product_ids: list[int | str] = Field(
+        default_factory=list,
+        description="过滤后需要保留的商品 ID 列表（商品 id 可能是整数或字符串）",
+    )
+    reason: str = Field(default="", description="过滤理由说明，尤其是过滤结果为空时需解释原因")
 
 
 ## ======================= 比较商品的子图（基于商品id） ================

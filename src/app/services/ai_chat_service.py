@@ -67,6 +67,7 @@ class AIChatService:
 
     # 给前端展示的用户友好 Agent 节点语义映射
     _NODE_MESSAGES = {
+        "intent_decomposer_node": "🎏 正在意图识别...",
         "searching_subgraph_node": "🔍 正在全网检索匹配的商品...",
         "tool_node": "🔍 正在执行商品搜索...",
         "filter_node": "⚖️ 正在为您过滤劣质商品...",
@@ -251,20 +252,6 @@ class AIChatService:
                                 "node": name
                             })
 
-                # 3. 降级回答
-                elif kind == "on_chain_end" and name == "LangGraph":
-                    if not has_streamed_answer:
-                        output = event.get("data", {}).get("output", {})
-                        if isinstance(output, dict):
-                            answer = output.get("answer", "")
-                            if answer:
-                                yield self._format_sse_event("token_stream", {
-                                    "content": answer,
-                                    "node": "system_fallback"
-                                })
-                        else:
-                            logger.error(f"[DEBUG SSE] >>> on_chain_end output is not dict, skipping fallback, output={output}")
-
             # 发送完成事件
             print("[DEBUG SSE] >>> complete")
             yield self._format_sse_event("complete", {"message": "对话完成"})
@@ -276,6 +263,7 @@ class AIChatService:
                         
         except Exception as e:
             logger.error(f"流式对话失败: {e}", exc_info=True)
+            # todo 但是无法存储到 messages 消息历史了
             yield self._format_sse_event("error", {"message": "抱歉，服务暂时不可用"})
     
     def _format_sse_event(self, event_type: str, data: dict) -> str:

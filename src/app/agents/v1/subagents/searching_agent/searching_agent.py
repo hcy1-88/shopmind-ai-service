@@ -24,7 +24,7 @@ from app.agents.v1.subagents.searching_agent.edges import (
     route_after_ready,
     router_after_filter,
 )
-from app.agents.v1.subagents.searching_agent.nodes.tools import tool_node
+from app.agents.v1.subagents.searching_agent.nodes.tools_node import tool_node
 from app.utils.logger import app_logger as logger
 
 

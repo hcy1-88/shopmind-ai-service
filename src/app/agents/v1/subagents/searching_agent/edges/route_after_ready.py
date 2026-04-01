@@ -1,7 +1,7 @@
 """ready节点后路由"""
 from typing import Literal
 
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import AIMessage, BaseMessage
 
 from app.agents.v1.schema import SearchingSubgraphState
 
@@ -12,8 +12,7 @@ def route_after_ready(state: SearchingSubgraphState) -> Literal["filter_node", "
     if not subgraph_messages:
         return "filter_node"
     last_message = subgraph_messages[-1]
-    # 有 tool call，进入 ToolNode
-    if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+    # 只有 AIMessage（带 tool_calls）才进 tool_node；ToolMessage 已执行完工具，直接进 filter_node
+    if isinstance(last_message, AIMessage) and last_message.tool_calls:
         return "tool_node"
-    # 无 tool call，进入过滤节点
     return "filter_node"

@@ -12,4 +12,8 @@ def handle_tool_error(error: Exception) -> str:
     return "工具暂时无法使用"
 
 
-tool_node = ToolNode([search_product, get_product_detail], handle_tool_errors=handle_tool_error)
+tool_node = ToolNode(
+    [search_product, get_product_detail],
+    handle_tool_errors=handle_tool_error,
+    messages_key="subgraph_messages",  # 子图的消息存在 subgraph_messages 中
+)

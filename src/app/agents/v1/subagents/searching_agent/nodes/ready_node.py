@@ -53,5 +53,5 @@ async def ready_node(state: SearchingSubgraphState, runtime: Runtime[ShopmindAss
 
     # 绑定工具并调用 LLM
     llm_with_tools = llm.bind_tools([search_product, get_product_detail])
-    response = llm_with_tools.invoke({"messages": subgraph_messages})
+    response = llm_with_tools.invoke(subgraph_messages)
     return {"subgraph_messages": [response]}

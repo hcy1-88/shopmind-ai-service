@@ -5,10 +5,10 @@ from app.agents.v1.schema import SearchingSubgraphState
 
 
 def router_after_filter(state: SearchingSubgraphState) -> Literal["generate_node", "ready_node"]:
-    """filer_node 之后的条件边"""
+    """filter_node 之后的条件边"""
     task = state["task"]
     # 如果没有过滤出任何商品
-    if not task.filtered_product_ids:
+    if not state.get("filtered_product_ids"):
         # 递增 search_count
         current_count = state.get("search_count_loop", 0)
         new_count = current_count + 1
