@@ -202,7 +202,6 @@ class AIChatService:
                             })
 
             # 发送完成事件
-            print("[DEBUG SSE] >>> complete")
             yield self._format_sse_event("complete", {"message": "对话完成"})
             
             logger.info(
@@ -212,7 +211,7 @@ class AIChatService:
                         
         except Exception as e:
             logger.error(f"流式对话失败: {e}", exc_info=True)
-            # todo 但是无法存储到 messages 消息历史了
+            # todo 但是无法存储到 messages 消息历史了。 预期解决办法: 前端在缺失的 ai 消息块上加一个刷新按钮，后端负责重新 chat_stream
             yield self._format_sse_event("error", {"message": "抱歉，服务暂时不可用"})
 
     def _format_sse_event(self, event_type: str, data: dict) -> str:
