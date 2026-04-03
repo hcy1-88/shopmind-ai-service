@@ -194,6 +194,30 @@ async def get_product_detail(product_id: int, tool_call_id: Annotated[str, Injec
         })
 
 
+@tool
+async def get_product_detail_for_comparison(product_id: int, tool_call_id: Annotated[str, InjectedToolCallId]) -> str:
+    """
+    根据商品ID查询商品详情，用于商品比较场景。
+    返回商品完整信息（价格、描述、库存、款式等）的 JSON 字符串。
+
+    Args:
+        product_id: 商品ID
+        tool_call_id: tool_call_id 注入
+
+    Returns:
+        商品详情的 JSON 字符串
+    """
+    try:
+        logger.info(f"[商品比较工具] 获取商品详情，product_id={product_id}")
+        product_client = await get_product_service_client()
+        result: ProductResponseDto = await product_client.get_product_by_id(product_id)
+        logger.info(f"[商品比较工具] 获取商品详情成功！product_name={result.name}")
+        return result.model_dump_json()
+    except Exception as e:
+        logger.error(f"[商品比较工具] 获取商品详情失败: {e}", exc_info=True)
+        return f"商品详情获取失败: {str(e)}"
+
+
 # ========== External Tools ==========
 
 
