@@ -10,7 +10,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from app.agents.v1.shopmind_graph import ShopmindAgentGraph
 from app.agents.v1.subagents.searching_agent.searching_agent import SearchingSubgraph
 from app.agents.v1.subagents.chitchat_agent import ChitChatService
-from app.agents.v1.subagents.comparison_agent.comparison_agent import ComparisonSubgraph
+from app.agents.v1.subagents.comparison_agent.comparison_service import ComparisonService
 from app.utils.logger import app_logger as logger
 
 
@@ -21,7 +21,7 @@ class GraphFactory:
     初始化顺序：
     1. 构建 ShoppingSubgraph
     2. 获取 ChitChatService 单例
-    3. 构建 ComparisonSubgraph
+    3. 获取 ComparisonService 单例（懒加载）
     4. 初始化 ShopmindAgentGraph 并持有子图引用
     """
 
@@ -44,11 +44,11 @@ class GraphFactory:
         # 2. 获取 ChitChatService 单例
         chitchat_agent = cls._build_chitchat_agent()
 
-        # 3. 构建 ComparisonSubgraph
-        comparison_subgraph = cls._build_comparison_subgraph(checkpointer)
+        # 3. 获取 ComparisonService 单例
+        comparison_service = cls._build_comparison_service()
 
         # 4. 初始化父图
-        main_graph = cls._build_main_graph(checkpointer, shopping_subgraph, chitchat_agent, comparison_subgraph)
+        main_graph = cls._build_main_graph(checkpointer, shopping_subgraph, chitchat_agent, comparison_service)
 
         logger.info("GraphFactory 所有图构建完成!")
         return main_graph
@@ -83,20 +83,17 @@ class GraphFactory:
         return chitchat_agent
 
     @classmethod
-    def _build_comparison_subgraph(cls, checkpointer: BaseCheckpointSaver) -> ComparisonSubgraph:
+    def _build_comparison_service(cls) -> ComparisonService:
         """
-        构建 ComparisonSubgraph
-
-        Args:
-            checkpointer: checkpointer 实例
+        获取 ComparisonService 单例（懒加载，首次调用时构建 agent）
 
         Returns:
-            ComparisonSubgraph 单例
+            ComparisonService 单例
         """
-        comparison_subgraph = ComparisonSubgraph.get_instance()
-        comparison_subgraph.build_comparison_subgraph(checkpointer)
-        logger.info("ComparisonSubgraph 构建完成")
-        return comparison_subgraph
+        comparison_service = ComparisonService.get_instance()
+        comparison_service.build_agent()
+        logger.info("ComparisonService 构建完成")
+        return comparison_service
 
     @classmethod
     def _build_main_graph(
@@ -104,7 +101,7 @@ class GraphFactory:
         checkpointer: BaseCheckpointSaver,
         shopping_subgraph: SearchingSubgraph,
         chitchat_agent: ChitChatService,
-        comparison_subgraph: ComparisonSubgraph,
+        comparison_service: ComparisonService,
     ) -> ShopmindAgentGraph:
         """
         构建主图并持有子图引用
@@ -113,12 +110,12 @@ class GraphFactory:
             checkpointer: checkpointer 实例
             shopping_subgraph: Shopping 子图实例
             chitchat_agent: ChitChatService 实例
-            comparison_subgraph: ComparisonSubgraph 实例
+            comparison_service: ComparisonService 实例
 
         Returns:
             ShopmindAgentGraph 单例
         """
         main_graph = ShopmindAgentGraph.get_instance()
-        main_graph.init_graph(checkpointer, shopping_subgraph, chitchat_agent, comparison_subgraph)
+        main_graph.init_graph(checkpointer, shopping_subgraph, chitchat_agent, comparison_service)
         logger.info("ShopmindAgentGraph 构建完成")
         return main_graph

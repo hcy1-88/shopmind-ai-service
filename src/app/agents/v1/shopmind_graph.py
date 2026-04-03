@@ -25,7 +25,7 @@ from app.utils.logger import app_logger as logger
 if TYPE_CHECKING:
     from app.agents.v1.subagents.searching_agent.searching_agent import SearchingSubgraph
     from app.agents.v1.subagents.chitchat_agent import ChitChatService
-    from app.agents.v1.subagents.comparison_agent import ComparisonSubgraph
+    from app.agents.v1.subagents.comparison_agent.comparison_service import ComparisonService
 
 
 class ShopmindAgentGraph:
@@ -60,21 +60,21 @@ class ShopmindAgentGraph:
         self._graph: CompiledStateGraph | None = None
         self.shopping_subgraph: "SearchingSubgraph | None" = None  # 持有子图引用
         self.chitchat_agent: "ChitChatService | None" = None  # 持有 chitchat 引用
-        self.comparison_subgraph: "ComparisonSubgraph | None" = None  # 持有比较子图引用
+        self.comparison_service: "ComparisonService | None" = None  # 持有比较服务引用
         logger.info("ShopmindAgentGraph 初始化成功!")
 
-    def init_graph(self, checkpointer, shopping_subgraph: "SearchingSubgraph", chitchat_agent: "ChitChatService", comparison_subgraph: "ComparisonSubgraph"):
+    def init_graph(self, checkpointer, shopping_subgraph: "SearchingSubgraph", chitchat_agent: "ChitChatService", comparison_service: "ComparisonService"):
         """初始化主图，持有子图引用并构建主图
 
         Args:
             checkpointer: checkpointer 实例
             shopping_subgraph: Shopping 子图实例
             chitchat_agent: ChitChatService 实例
-            comparison_subgraph: ComparisonSubgraph 实例
+            comparison_service: ComparisonService 实例
         """
         self.shopping_subgraph = shopping_subgraph
         self.chitchat_agent = chitchat_agent
-        self.comparison_subgraph = comparison_subgraph
+        self.comparison_service = comparison_service
         self._graph = self._build_graph(checkpointer)
 
     def get_graph(self) -> CompiledStateGraph:
