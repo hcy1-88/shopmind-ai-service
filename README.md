@@ -93,6 +93,8 @@ subgraph_node  node          node         subgraph_node
              END
 ```
 
+![Agent 架构图](./docs/agent-architecture.drawio.png)
+
 ### 导购子图结构（ShoppingSubgraph）
 
 ```
