@@ -74,7 +74,7 @@ class Step4Item(BaseModel):
 
 # ======================= 活跃任务过滤 =======================
 
-ACTIVE_TASK_STATUSES = {TaskStatus.NEW, TaskStatus.CLARIFYING, TaskStatus.READY}
+ACTIVE_TASK_STATUSES = {TaskStatus.NEW, TaskStatus.CLARIFYING, TaskStatus.READY, TaskStatus.WAITING}
 
 
 def _filter_active_subtasks(subtasks: list[SubTask], max_count: int) -> list[SubTask]:
@@ -91,19 +91,41 @@ def _filter_active_subtasks(subtasks: list[SubTask], max_count: int) -> list[Sub
 
 STEP1_PROMPT = """
 # Role
-你是一个电商领域的意图分类专家。你的任务是将用户的查询拆解为独立的原子子问题，并判断每个子问题的意图类型。
+你是一个电商领域的意图分类专家（以消费者视角猜测意图）。你的任务是将用户的查询拆解为独立的原子子问题，并判断每个子问题的意图类型。
+
+# 历史任务上下文
+{history_context}
 
 # Intent Categories
 1. **SHOPPING**: 商品查找、推荐、比价、属性确认（如"我想买手机"、"有没有红色的裙子"），总之是用户有购物意图，需要搜索商品的一类问题
 2. **PLATFORM**: 平台政策、退货物流、支付、账号操作（如"怎么退货"、"会员权益"）
 3. **CHITCHAT**: 闲聊、问候、情感交流，或与电商无关的知识问答（如"你好"、"天气不错"）
-4. **COMPARISON**: 用户使用代词（"这几个"、"那些"）指代已推荐商品，然后要求比较这些商品的场景，其他的比较场景意图都是闲聊。比如 "华为和苹果哪个好" 这种问题属于闲聊，这点要注意。
+4. **COMPARISON**: 比较已推荐商品的场景。**判断规则**：当历史任务中 has_recommended_product_ids 非空时，如果 query 是在比较/推荐这些已推荐商品（如"海飞丝和飘柔洗发水有什么区别"），则为 COMPARISON；has_recommended_product_ids 为空时，泛泛的品牌/商品比较属于闲聊（如"华为和苹果哪个好"）。
+
+# 拆解思路（按顺序执行）
+
+**Step 1: 先判断意图数量**
+仔细阅读用户问题，判断它在问**几件事**。
+- 如果多个子句在表达**同一类事情**（如比较+推荐），算1个意图
+- 如果明确问的是**不同类事情**（如购物+退货、同时买多个明确的物品单元），才算多个意图
+
+**Step 2: 再判断每个意图的类型**
+确定了数量后，再分别判断每个意图的类型。
+
+**Step 3: 生成 sub_query**
+- 1个意图 → 整个 query 或合并后的完整描述作为 sub_query
+- 多个意图 → 每个意图一个 sub_query
+
+**Step 4: 回查是否需要合并**
+如果发现两个 sub_query 其实是**同一个意图的不同表达**，合并它们。
 
 # Rules
-- 用户一个问题可能包含多个相同或不同的意图，你应该识别彼此独立的意图，并分解出子问题
-- 每个原子子问题只能属于一种意图类型
+- **宁少勿多**：拆分意图时尽量保守，除非明显是多意图，否则不拆分
+- 每个原子子问题只能属于一种意图
 - 如果整句是闲聊，返回一个 CHITCHAT 类型的 item
 - 如果混合闲聊和业务需求，保留业务需求的 item 和闲聊的 item
+- **不要拆分主需求和品类修饰词**："学习Python的书" 不要拆成 "学习Python" + "书"，应该是一个 item："学习Python的书"；同理 "红色连衣裙" 也不要拆成 "红色" + "连衣裙"
+- **COMPARISON vs CHITCHAT**：历史任务中 has_recommended_product_ids 非空 + query 比较这些商品 → COMPARISON；否则 → CHITCHAT
 
 # Output Format
 输出标准 JSON 对象，包含 items 字段：
@@ -114,36 +136,75 @@ STEP1_PROMPT = """
 
 {format_instructions}
 
-# Few-Shot Examples
+# 拆解示例
 
-User: "推荐一款洗发水,款式随便"
+## 示例1：历史中有已推荐商品 - COMPARISON
+History: task_id=task_001, product_category=洗发水, has_recommended_product_ids=[P001,P002]
+User: "海飞丝洗发水和飘柔洗发水有什么区别？"
+分析：has_recommended_product_ids 非空，且 query 比较的是这些已推荐商品
+→ intent=COMPARISON
 ```json
-{{"items": [{{"sub_query": "推荐一款洗发水,款式随便", "intent": "SHOPPING"}}]}}
+{{"items": [{{"sub_query": "海飞丝洗发水和飘柔洗发水有什么区别？", "intent": "COMPARISON"}}]}}
 ```
 
-User: "推荐一款洗发水，另外我想买一只猫"
+## 示例2：历史中无已推荐商品 - CHITCHAT
+History: 无历史任务
+User: "华为和苹果哪个好？"
+分析：has_recommended_product_ids 为空，属于泛泛的品牌比较
+→ intent=CHITCHAT
 ```json
-{{"items": [{{"sub_query": "推荐一款洗发水", "intent": "SHOPPING"}}, {{"sub_query": "我想买一只猫", "intent": "SHOPPING"}}]}}
+{{"items": [{{"sub_query": "华为和苹果哪个好？", "intent": "CHITCHAT"}}]}}
 ```
 
-User: "推荐一款洗发水。退货流程是什么？"
+## 示例3：真正多意图（需要拆分）
+User: "推荐一款洗发水，另外退货流程是什么？"
+分析：2件不同类事情
 ```json
 {{"items": [{{"sub_query": "推荐一款洗发水", "intent": "SHOPPING"}}, {{"sub_query": "退货流程是什么？", "intent": "PLATFORM"}}]}}
 ```
 
+## 示例4：避免过度拆分
+User: "学习Python的书"
+分析：1件事
+```json
+{{"items": [{{"sub_query": "学习Python的书", "intent": "SHOPPING"}}]}}
+```
+
+## 示例5：闲聊
 User: "你好呀，今天天气不错"
 ```json
 {{"items": [{{"sub_query": "你好呀，今天天气不错", "intent": "CHITCHAT"}}]}}
 ```
 
-User: "华为和iPhone选哪个好？"
+## 错误示例（必须避免）
+
+### 错误1: 凭空捏造
+User: "学习Python的书"
 ```json
-{{"items": [{{"sub_query": "华为和iPhone选哪个好？", "intent": "CHITCHAT"}}]}}
+{{"items": [{{"sub_query": "学习Python的书", "intent": "SHOPPING"}}, {{"sub_query": "学习Python的视频课程", "intent": "SHOPPING"}}]}}
 ```
+❌ 错误：不要凭空捏造用户没有提到的内容！
+
+### 错误2: 过度拆分
+User: "学习Python的书，你有什么推荐吗"
+```json
+{{"items": [{{"sub_query": "学习Python的书", "intent": "SHOPPING"}}, {{"sub_query": "你有什么推荐吗", "intent": "SHOPPING"}}]}}
+```
+❌ 错误：明明是一个意图，却拆成了两个
+
+### 错误3: 有已推荐商品却判为 CHITCHAT
+History: task_id=task_001, has_recommended_product_ids=[P001,P002]
+User: "P001和P002哪个好？"
+错误判断:
+```json
+{{"items": [{{"sub_query": "P001和P002哪个好？", "intent": "CHITCHAT"}}]}}
+```
+❌ 错误：has_recommended_product_ids 非空，query 比较的是已推荐商品，应该是 COMPARISON
+
 """
 
 
-async def step1_intent_classify(llm, rewritten_query: str) -> list[Step1Item]:
+async def step1_intent_classify(llm, rewritten_query: str, subtasks: list[SubTask]) -> list[Step1Item]:
     """Step 1: 意图分类 + 原子拆分"""
     from pydantic import create_model
 
@@ -157,12 +218,14 @@ async def step1_intent_classify(llm, rewritten_query: str) -> list[Step1Item]:
         items: list[DynamicStep1Item] = Field(description="意图拆分结果列表")
 
     parser = PydanticOutputParser(pydantic_object=Step1Result)
+    history_context = _build_history_context_for_step2(subtasks)
     prompt = ChatPromptTemplate.from_messages([
         ("system", STEP1_PROMPT),
-        ("human", "User: {query}")
+        ("human", "User Query: {query}\n\n{history_context}")
     ])
     prompt = prompt.partial(
         format_instructions=parser.get_format_instructions(),
+        history_context=history_context,
     )
     chain = prompt | llm | parser
 
@@ -260,15 +323,12 @@ async def step2_task_match(llm, step1_items: list[Step1Item], subtasks: list[Sub
         ("system", STEP2_HISTORY_PROMPT),
         ("human", "User Query: {query}\n\n{history_context}")
     ])
-    prompt = prompt.partial(
-        format_instructions=parser.get_format_instructions(),
-        history_context=history_context,
-    )
+
     chain = prompt | llm | parser
 
     results = []
     for item in step1_items:
-        result = await chain.ainvoke({"query": item.sub_query})
+        result = await chain.ainvoke({"query": item.sub_query, "history_context": history_context})
         results.append(Step2Item(
             sub_query=result.sub_query,
             intent=result.intent,
@@ -403,6 +463,7 @@ async def step3_extract_slots(llm, step2_items: list[Step2Item], subtasks: list[
             continue
 
         # 根据是否有 matched_task_id 选择不同的 prompt 版本
+        # matched_slots 的 key 是字符串，与 matched_task_id 类型一致
         if item.matched_task_id and item.matched_task_id in matched_slots:
             # 有历史槽位：注入历史上下文
             history_info = matched_slots[item.matched_task_id]
@@ -434,7 +495,7 @@ STEP4_PROMPT = """
 你是一个搜索意愿判断专家。根据用户的子查询判断是否要立即触发搜索。
 
 # 判断规则
-- **explicit_search=true**: 用户说"搜一下"、"款式随意"、"随便"、"都行"、"直接推荐吧"
+- **explicit_search=true**: 用户说类似 "搜一下"、"款式随意"、"随便"、"都行"、"直接推荐吧" 的话，总之你能体会到用户想立刻搜索商品的意愿
 - **is_replace_products=true**: 用户说"换一批"、"再看看"、"换一个"
 
 # 重要
@@ -561,7 +622,7 @@ async def intent_decomposer_node(state: ShopmindAgentState, runtime: Runtime[Sho
     filtered_subtasks = _filter_active_subtasks(subtasks, max_count=max_history_task_count)
 
     # Step 1: 意图分类 + 原子拆分
-    step1_items = await step1_intent_classify(llm, state.get("rewritten_query", ""))
+    step1_items = await step1_intent_classify(llm, state.get("rewritten_query", ""), filtered_subtasks)
 
     # Step 2: 历史任务匹配
     step2_items = await step2_task_match(llm, step1_items, filtered_subtasks)
@@ -601,10 +662,12 @@ async def intent_decomposer_node(state: ShopmindAgentState, runtime: Runtime[Sho
                     is_replace_products=intent_item.is_replace_products,
                     max_search_loop=max_search_loop,
                 )
+                logger.info(f"[意图识别] - 新建了一个 shopping 意图 task: {current_subtask}")
                 subtasks.append(current_subtask)
             else:
                 _update_subtask_slots(matched_subtask, intent_item.extracted_slots)
                 matched_subtask.is_replace_products = intent_item.is_replace_products
+                logger.info(f"[意图识别]-匹配到历史任务 subtask: {matched_subtask}")
                 current_subtask = matched_subtask
             _handle_clarification(current_subtask, intent_item, max_clarification_count)
 
@@ -640,10 +703,12 @@ async def intent_decomposer_node(state: ShopmindAgentState, runtime: Runtime[Sho
                 product_ids=product_ids,
             )
             current_subtask = new_subtask
+            logger.info(f"[意图识别] - 新建了一个 comparison 意图 task: {current_subtask}")
             subtasks.append(new_subtask)
 
         state["current_tasks"].append(current_subtask)
 
+    logger.info(f"[意图识别] - thread_id:{context.thread_id}, subtasks 个数: {len(subtasks)}, 当前任务个数: {len(subtasks)}")
     state["sub_tasks"] = subtasks
     return state
 

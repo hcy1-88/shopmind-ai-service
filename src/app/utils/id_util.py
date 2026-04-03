@@ -76,5 +76,10 @@ id_generator = SnowflakeIDGenerator(node_id=1)
 
 
 def gen_id() -> int:
-    """雪花算法 id"""
+    """雪花算法 id（返回 int）"""
     return id_generator.generate_id()
+
+
+def gen_str_id() -> str:
+    """雪花算法 id（返回 str）"""
+    return str(id_generator.generate_id())

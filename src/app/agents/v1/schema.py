@@ -15,7 +15,7 @@ from langgraph.graph import add_messages
 from app.schemas.page_result_schema import PageResult
 from app.schemas.product_response_schema import ProductResponseDto
 
-from app.utils.id_util import gen_id
+from app.utils.id_util import gen_str_id
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage
 from pydantic import BaseModel, Field
@@ -86,7 +86,7 @@ class IntentResponse(BaseModel):
 
 class SubTask(BaseModel):
     """SubTask 基类 - 所有意图类型的通用父类"""
-    task_id: str = Field(default_factory=gen_id)
+    task_id: str = Field(default_factory=gen_str_id)
     category: IntentCategory = Field(default=None, description="意图识别的分类")
     sub_query: str = Field(description="重写后的子问题")
     status: TaskStatus
