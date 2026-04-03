@@ -14,7 +14,7 @@ async def clarifying_node(state: SearchingSubgraphState, runtime: Runtime[Shopmi
     llm = runtime.context.llm
     thread_id = runtime.context.thread_id
 
-    logger.info(f"[clarifying_node] thread_id: {thread_id}, task_id: {task.task_id}")
+    logger.info(f"[clarifying_node] 执行前 thread_id: {thread_id}, task_id: {task.task_id}, task_clarification_count: {task.clarification_count}")
 
     # 构建槽位状态描述
     product_category = task.product_category or "未指定"
@@ -60,10 +60,11 @@ async def clarifying_node(state: SearchingSubgraphState, runtime: Runtime[Shopmi
         if not question:
             question = "能再告诉我一些关于您想要的商品信息吗？"
     except Exception as e:
-        logger.error(f"[ClarifyingNode] LLM 调用失败: {e}", exc_info=True)
+        logger.error(f"[clarifying_node] LLM 调用失败: {e}", exc_info=True)
         question = "能再告诉我一些关于您想要的商品信息吗？"
 
     task.final_response = question
     task.clarification_count += 1
-
+    logger.info(
+        f"[clarifying_node] 执行后 thread_id: {thread_id}, task_id: {task.task_id}, task_clarification_count: {task.clarification_count}")
     return {"task": task}
