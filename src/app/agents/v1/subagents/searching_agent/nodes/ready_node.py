@@ -52,7 +52,7 @@ async def ready_node(state: SearchingSubgraphState, runtime: Runtime[ShopmindAss
             f"\n【换一批】你已经在以下页码搜索过：{searched}。"
             f"本次请从第 {next_page} 页开始搜索，**不要再重复搜索已搜索过的页码**。"
         )
-
+    user_prompt += "\n 注意: **搜索到的每一件商品，务必查询商品详情**"
     subgraph_messages.append(HumanMessage(content=user_prompt))
 
     # 绑定工具并调用 LLM
