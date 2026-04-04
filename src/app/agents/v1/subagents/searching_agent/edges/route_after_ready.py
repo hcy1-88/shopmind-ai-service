@@ -12,6 +12,7 @@ def route_after_ready(state: SearchingSubgraphState) -> Literal["filter_node", "
     """根据 ready_node 输出的 AI message 是否有 tool_calls 决定路由
 
     当 tool_loop >= max_tool_loop 时，强制跳转到 filter_node，防止无限循环。
+    tool_loop 的递增在 ready_node 返回时通过 Command捎带，本边只负责读取和判断。
     """
     subgraph_messages: list[BaseMessage] = state.get("subgraph_messages", [])
     if not subgraph_messages:
@@ -24,7 +25,5 @@ def route_after_ready(state: SearchingSubgraphState) -> Literal["filter_node", "
         if tool_loop >= max_tool_loop:
             # 超限，强制跳转 filter_node
             return "filter_node"
-        # 递增工具循环计数器，写回 state
-        state["tool_loop"] = tool_loop + 1
         return "tool_node"
     return "filter_node"

@@ -141,7 +141,7 @@ class ProductServiceClient:
         try:
             base_url = await self._get_base_url()
             url = f"{base_url}/products/search"
-            logger.info(f"获取新商品, url={url}, page_number={page_number}, page_size={page_size}")
+            logger.info(f"搜索商品, url={url}, page_number={page_number}, page_size={page_size}")
 
             headers = self._get_headers()
 

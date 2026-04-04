@@ -2,9 +2,11 @@
 
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
+from langgraph.config import get_config
 from langgraph.runtime import Runtime
 
 from app.agents.v1.schema import ShoppingSubTask, SearchingSubgraphState, ShopmindAssistantContext, FilterResult
+from app.agents.v1.config import MAX_SEARCH_LOOP
 from app.schemas.product_response_schema import ProductResponseDto
 from app.utils.logger import app_logger as logger
 
@@ -15,13 +17,16 @@ async def filter_node(state: SearchingSubgraphState, runtime: Runtime[ShopmindAs
     searched_details: list[ProductResponseDto] = state.get("searched_details", [])
     llm = runtime.context.reasoning_llm
     thread_id = runtime.context.thread_id
+    cfg = get_config().get("configurable", {})
+    max_search_loop = cfg.get(MAX_SEARCH_LOOP, 3)
 
     logger.info(f"[filter_node] thread_id: {thread_id}, task_id: {task.task_id}")
 
     # 如果没有搜索到任何商品
     if not searched_details:
         task.final_response = "抱歉，没有搜索到符合您条件的商品"
-        return {"task": task}
+        # 强制跳转到 generator_node：设一个必定超限的值
+        return {"task": task, "search_count_loop": max_search_loop}
 
     # 构建商品详情文本：全量序列化搜索到的商品
     product_details_list = []
@@ -107,6 +112,25 @@ async def filter_node(state: SearchingSubgraphState, runtime: Runtime[ShopmindAs
     # 更新 has_recommended_product_ids
     existing = set(task.has_recommended_product_ids)
     task.has_recommended_product_ids = list(existing | set(result.filtered_product_ids))
+
+    # 如果过滤结果为空，且未超过 search_count_loop 上限，需要"换一批"
+    # search_count_loop 和 tool_loop 的更新通过返回值捎带
+    if not result.filtered_product_ids:
+        cfg = get_config().get("configurable", {})
+        max_search_loop = cfg.get(MAX_SEARCH_LOOP, 3)
+        search_count_loop = state.get("search_count_loop", 0)
+        next_count = search_count_loop + 1
+
+        if next_count < max_search_loop:
+            # 未超限，设置换一批标记，通过返回值更新状态
+            task.is_replace_products = True
+            return {
+                "task": task,
+                "product_after_filter": [],
+                "filtered_product_ids": [],
+                "search_count_loop": next_count,
+                "tool_loop": 0,
+            }
 
     return {
         "product_after_filter": product_after_filter,

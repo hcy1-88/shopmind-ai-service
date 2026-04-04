@@ -1,6 +1,6 @@
 """就绪节点"""
 
-from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, SystemMessage, HumanMessage
 from langgraph.runtime import Runtime
 
 from app.agents.v1.schema import SearchingSubgraphState, ShopmindAssistantContext
@@ -24,16 +24,16 @@ async def ready_node(state: SearchingSubgraphState, runtime: Runtime[ShopmindAss
 
         ## 可用工具
         - search_product: 根据自然语言 query 搜索商品，返回商品列表（包含商品 ID、名称、价格等），一页大小固定为 5.
-        - get_product_detail: 根据 product_id 获取商品详细信息（款式、价格、库存等 sku 规格）
+        - get_product_detail: 根据 product_id 获取商品详细信息（款式、价格、库存等 sku 规格），**必须调用此工具获取商品详情**
 
-        ## 任务
-        1. 如果需要搜索商品，请调用 search_product 工具（参数 query 使用商品品类和关键词构造）
-        2. 当搜索到商品后，请调用 get_product_detail 工具获取商品详情，它是完整的商品信息
-        3. 最终输出所有你搜索到的商品详情（注意是商品详情）.
+        ## 重要：工具调用顺序
+        1. 首先调用 search_product 搜索商品，获得商品 ID 列表
+        2. **必须**对每一个搜索到的商品，调用 get_product_detail 获取其完整详情
+        3. 等待所有 get_product_detail 返回后，工具调用结束
 
         ## 工具使用规则
-        1，使用 search_product 搜索商品时，默认从第 1 页搜索，**如果用户消息明确了页号，请务必以用户指定的页号为起始搜索页**
-        2. 如果没有搜索到任何商品或者搜索结果小于 5 个，请停止调用工具。因为第1页搜不到，第2页肯定也搜不到，没必要重试。
+        1. 使用 search_product 搜索商品时，默认从第 1 页搜索，**如果用户消息明确了页号，请务必以用户指定的页号为起始搜索页**
+        2. 如果第1页没有搜索到任何商品或者搜索结果小于 5 个，请停止调用工具。因为第1页搜索结果个数不够，第2页肯定也不够，没必要重试。
 
         ## 当不需要调用工具时，请返回推荐文案。
         """
@@ -58,4 +58,12 @@ async def ready_node(state: SearchingSubgraphState, runtime: Runtime[ShopmindAss
     # 绑定工具并调用 LLM
     llm_with_tools = llm.bind_tools([search_product, get_product_detail])
     response = llm_with_tools.invoke(subgraph_messages)
+
+    # 检测到 tool_calls 时递增 tool_loop，返回值写入 checkpoint 持久化
+    if isinstance(response, AIMessage) and response.tool_calls:
+        tool_loop = state.get("tool_loop", 0)
+        return {
+            "subgraph_messages": [response],
+            "tool_loop": tool_loop + 1,
+        }
     return {"subgraph_messages": [response]}
