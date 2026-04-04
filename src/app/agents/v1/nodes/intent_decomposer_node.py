@@ -382,6 +382,11 @@ User: "推荐一款拍照好看的华为手机，预算3000以内"
 {{"product_category": "手机", "keywords": ["拍照好看", "华为"], "filters": {{"price_max": 3000}}}}
 ```
 
+User: "情人节送女朋友的礼物" (无商品品类，所以 product_category 应该是空)
+```json
+{{"product_category": "", "keywords": ["情人节送女朋友的礼物"], "filters": {{}}}}
+```
+
 ## 有历史上下文（continuation query）
 
 User: "换成蓝色的"
