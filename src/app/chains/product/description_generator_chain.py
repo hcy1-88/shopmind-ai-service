@@ -29,7 +29,7 @@ class DescriptionGenerationChain(VisionAwareAIGenerator[DescriptionGenerateReque
             1. 突出商品的核心卖点和特色
             2. 使用生动、吸引人的语言
             3. 符合电商规范，避免虚假宣传
-            4. 长度控制在100-300字之间
+            4. 长度控制在1500字以内
             5. 结构清晰，易于阅读
             6. 适当使用分段和符号增强可读性
             
@@ -44,7 +44,7 @@ class DescriptionGenerationChain(VisionAwareAIGenerator[DescriptionGenerateReque
             2. 突出商品的核心卖点和特色
             3. 使用生动、吸引人的语言
             4. 符合电商规范，避免虚假宣传
-            5. 长度控制在100-300字之间
+            5. 长度控制在1500字以内
             6. 结构清晰，易于阅读
             
             请直接返回生成的商品描述文本，不要包含任何额外说明。
