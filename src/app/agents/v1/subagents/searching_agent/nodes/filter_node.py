@@ -32,6 +32,7 @@ async def filter_node(state: SearchingSubgraphState, runtime: Runtime[ShopmindAs
     filters = task.filters or {}
     has_recommended = task.has_recommended_product_ids or []
     is_replace = task.is_replace_products
+    product_category = task.product_category if task.product_category else "未指定"
 
     parser = PydanticOutputParser(pydantic_object=FilterResult)
     format_instructions = parser.get_format_instructions()
@@ -45,12 +46,18 @@ async def filter_node(state: SearchingSubgraphState, runtime: Runtime[ShopmindAs
     system_prompt = """你是一个电商导购助手，负责从搜索结果中筛选出最符合用户需求的商品。
 
 ## 你的任务
-1. 仔细阅读商品详情 JSON，提取其中的商品 ID（id 字段）
-2. 根据用户的过滤条件（filters）筛选商品
+1. 仔细阅读商品详情 JSON，提取其中的商品 ID（id 字段）和商品品类信息
+2. 根据用户的过滤条件（filters）和商品品类（product_category）筛选商品
 3. 返回过滤前的所有商品 ID 列表（all_products_ids）、过滤后需要保留的商品 ID 列表（filtered_product_ids），以及过滤理由（reason）
 
+## 品类过滤规则（product_category）
+当用户指定了商品品类（product_category）时，你需要根据商品详情中的品类信息进行相关性过滤：
+- 只保留与 product_category 品类相关的商品
+- 排除与 product_category 完全不相关的商品（如用户要洗发水，但搜索结果中有耳机、防晒霜等）
+- 如果商品详情中没有品类信息，可以根据商品名称/描述推断
+
 ## 排除规则
-1. 如果 filters 过滤条件为空，说明没有过滤条件，所有商品都应该保留在 filtered_product_ids 中
+1. 如果 filters 过滤条件为空且 product_category 也为空，说明没有过滤条件，所有商品都应该保留在 filtered_product_ids 中
 2. {exclude_note}
 
 ## 输出格式
@@ -62,6 +69,9 @@ async def filter_node(state: SearchingSubgraphState, runtime: Runtime[ShopmindAs
 
 ## 用户的过滤条件（filters）
 {filters}
+
+## 用户期望的商品品类（product_category）
+{product_category}
 
 ## has_recommended_product_ids：
 {has_recommended}
@@ -80,6 +90,7 @@ async def filter_node(state: SearchingSubgraphState, runtime: Runtime[ShopmindAs
         "format_instructions": format_instructions,
         "product_details_text": product_details_text,
         "filters": filters,
+        "product_category": product_category,
         "has_recommended": has_recommended,
     })
 
