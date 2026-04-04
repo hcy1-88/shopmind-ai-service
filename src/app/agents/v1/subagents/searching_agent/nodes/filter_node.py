@@ -15,6 +15,7 @@ async def filter_node(state: SearchingSubgraphState, runtime: Runtime[ShopmindAs
     """对工具搜索结果进行 LLM 语义过滤，并更新 has_searched_product_id"""
     task: ShoppingSubTask = state["task"]
     searched_details: list[ProductResponseDto] = state.get("searched_details", [])
+    searched_res: list = state.get("searched_res", [])
     llm = runtime.context.reasoning_llm
     thread_id = runtime.context.thread_id
     cfg = get_config().get("configurable", {})
@@ -22,11 +23,21 @@ async def filter_node(state: SearchingSubgraphState, runtime: Runtime[ShopmindAs
 
     logger.info(f"[filter_node] thread_id: {thread_id}, task_id: {task.task_id}")
 
-    # 如果没有搜索到任何商品
+    # 如果没有搜索到任何商品详情，尝试从搜索结果中提取
     if not searched_details:
-        task.final_response = "抱歉，没有搜索到符合您条件的商品"
-        # 强制跳转到 generator_node：设一个必定超限的值
-        return {"task": task, "search_count_loop": max_search_loop}
+        # 从 searched_res 中提取商品列表
+        products_from_search: list[ProductResponseDto] = []
+        for page_result in searched_res:
+            if hasattr(page_result, "data") and page_result.data:
+                products_from_search.extend(page_result.data)
+
+        if products_from_search:
+            logger.info(f"[filter_node] searched_details 为空，从 searched_res 提取到 {len(products_from_search)} 个商品")
+            searched_details = products_from_search
+        else:
+            task.final_response = "抱歉，没有搜索到符合您条件的商品"
+            # 强制跳转到 generator_node：设一个必定超限的值
+            return {"task": task, "search_count_loop": max_search_loop}
 
     # 构建商品详情文本：全量序列化搜索到的商品
     product_details_list = []

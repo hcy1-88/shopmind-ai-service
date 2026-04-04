@@ -1,4 +1,4 @@
-"""Logging configuration for the application."""
+"""ShopMind AI Service 日志配置."""
 
 import logging
 import sys
@@ -9,7 +9,7 @@ from pythonjsonlogger import json
 
 from app.utils.trace_context import get_trace_id
 
-APP_LOGGER_NAME = "shopmind_ai_service"
+APP_LOGGER_NAME = "shopmind_ai"  # 简化日志名
 
 
 class TraceIDFilter(logging.Filter):
