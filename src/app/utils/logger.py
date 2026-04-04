@@ -9,7 +9,7 @@ from pythonjsonlogger import json
 
 from app.utils.trace_context import get_trace_id
 
-APP_LOGGER_NAME = "shopmind_ai"  # 简化日志名
+APP_LOGGER_NAME = "shopmind_ai_service"
 
 
 class TraceIDFilter(logging.Filter):
