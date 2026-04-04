@@ -47,7 +47,11 @@ async def ready_node(state: SearchingSubgraphState, runtime: Runtime[ShopmindAss
     if task.is_replace_products:
         # 换一批场景：从 filter_node 返回，需要追加用户消息指定页号
         next_page = max(task.searched_pages) + 1 if task.searched_pages else 1
-        user_prompt += f"\n搜索商品的起始页号是第 {next_page} 页！"
+        searched = ", ".join(str(p) for p in task.searched_pages) if task.searched_pages else "无"
+        user_prompt += (
+            f"\n【换一批】你已经在以下页码搜索过：{searched}。"
+            f"本次请从第 {next_page} 页开始搜索，**不要再重复搜索已搜索过的页码**。"
+        )
 
     subgraph_messages.append(HumanMessage(content=user_prompt))
 

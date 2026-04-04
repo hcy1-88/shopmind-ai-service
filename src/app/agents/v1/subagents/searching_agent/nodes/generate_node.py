@@ -83,11 +83,12 @@ async def generate_node(state: SearchingSubgraphState, runtime: Runtime[Shopmind
     task.is_replace_products = False
 
     return {
-        "subgraph_messages": [],
+        "subgraph_messages": ["__CLEAR__"],
         "searched_res": ["__CLEAR__"],
         "searched_details": ["__CLEAR__"],
         "filtered_product_ids": [],
         "product_after_filter": [],
         "search_count_loop": 0,
+        "tool_loop": 0,
         "task": task,
     }

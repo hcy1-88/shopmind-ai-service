@@ -47,6 +47,7 @@ class AIChatService:
         self.max_clarification_count = chat_config.get("max_clarification_count", 3)
         self.max_history_task_count = chat_config.get("max_history_task_count", 3)
         self.max_search_loop = chat_config.get("max_search_loop", 3)
+        self.max_tool_loop = chat_config.get("max_tool_loop", 3)
 
         logger.info("AIChatService 初始化完成")
 
@@ -129,7 +130,13 @@ class AIChatService:
 
             # 配置
             config = RunnableConfig(
-                configurable={"thread_id": thread_id},
+                configurable={
+                    "thread_id": thread_id,
+                    "max_clarification_count": self.max_clarification_count,
+                    "max_history_task_count": self.max_history_task_count,
+                    "max_search_loop": self.max_search_loop,
+                    "max_tool_loop": self.max_tool_loop,
+                },
                 # callbacks=[AgentTraceCallback(thread_id=thread_id)],
             )
 
@@ -137,9 +144,6 @@ class AIChatService:
             context = ShopmindAssistantContext(llm=llm_service.get_llm_service().get_chat_model(),
                                                reasoning_llm=llm_service.get_llm_service().get_reasoning_model(),
                                                thread_id=thread_id,
-                                               max_clarification_count=self.max_clarification_count,
-                                               max_history_task_count=self.max_history_task_count,
-                                               max_search_loop=self.max_search_loop,
             )
             
             # 记录是否发生过流式输出 (用于兜底拦截)

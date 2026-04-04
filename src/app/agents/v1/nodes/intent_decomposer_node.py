@@ -14,6 +14,7 @@ Step 4: 搜索意愿判断（仅 SHOPPING）
 from typing import Optional
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
+from langgraph.config import get_config
 from langgraph.runtime import Runtime
 from pydantic import BaseModel, Field
 from app.agents.v1.schema import (
@@ -28,6 +29,10 @@ from app.agents.v1.schema import (
     ComparisonSubTask,
     IntentCategory,
     TaskStatus,
+)
+from app.agents.v1.config import (
+    MAX_CLARIFICATION_COUNT,
+    MAX_HISTORY_TASK_COUNT,
 )
 from app.utils.logger import app_logger as logger
 
@@ -613,10 +618,11 @@ async def intent_decomposer_node(state: ShopmindAgentState, runtime: Runtime[Sho
     context = runtime.context
     logger.info(f"[intent_decomposer_node] thread_id: {context.thread_id}")
 
+    cfg = get_config().get("configurable", {})
+    max_clarification_count = cfg.get(MAX_CLARIFICATION_COUNT, 3)
+    max_history_task_count = cfg.get(MAX_HISTORY_TASK_COUNT, 3)
+
     llm = context.reasoning_llm
-    max_clarification_count = context.max_clarification_count
-    max_history_task_count = context.max_history_task_count
-    max_search_loop = context.max_search_loop
 
     subtasks = state.get("sub_tasks", [])
     filtered_subtasks = _filter_active_subtasks(subtasks, max_count=max_history_task_count)
@@ -660,7 +666,6 @@ async def intent_decomposer_node(state: ShopmindAgentState, runtime: Runtime[Sho
                     keywords=intent_item.extracted_slots.get("keywords", []),
                     filters=intent_item.extracted_slots.get("filters", {}),
                     is_replace_products=intent_item.is_replace_products,
-                    max_search_loop=max_search_loop,
                 )
                 logger.info(f"[意图识别] - 新建了一个 shopping 意图 task: {current_subtask}")
                 subtasks.append(current_subtask)

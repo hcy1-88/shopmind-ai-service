@@ -104,8 +104,6 @@ class ShoppingSubTask(SubTask):
     # 已经使用过的搜索页号
     searched_pages: list[int] = Field(default=[0], description="此搜索任务已经搜索过的页号")
     is_replace_products: bool = Field(default=False, description="是否为换一批场景，为 true 时 filter_node 排除已推荐商品")
-    # 一次对话内，调用搜索工具的最大循环次数（filter_node -> ready_node）
-    max_search_loop: int
 
 
 class PlatformSubTask(SubTask):
@@ -129,12 +127,6 @@ class ShopmindAssistantContext(BaseModel):
     # 推理模型，用于 intent_decomposer_node 和 filter_node 等需要严谨推理的节点
     reasoning_llm: BaseChatModel
     thread_id: str
-    # 最大澄清轮次
-    max_clarification_count: int
-    # 限制活跃的历史子任务（防止意图识别时上下文太长）
-    max_history_task_count: int
-    # 一次对话内，调用搜索工具的循环次数（filter_node -> ready_node）
-    max_search_loop: int
 
 
 class ShopmindAgentState(TypedDict):
@@ -202,12 +194,25 @@ def merge_searched_details(existing: list[ProductResponseDto], new: list[Product
     return existing + new
 
 
+def merge_subgraph_messages(existing: list[BaseMessage], new: list[BaseMessage]) -> list[BaseMessage]:
+    """subgraph_messages 专用 reducer：
+    - new == [] 时：保留 existing（返回空结果，不清空）
+    - new == ["__CLEAR__"] 时：清空（generate_node 显式重置）
+    - 否则：追加
+    """
+    if not new:
+        return existing
+    if new == ["__CLEAR__"]:
+        return []
+    return existing + new
+
+
 ## ======================= 搜索商品的子图状态 =================
 class SearchingSubgraphState(TypedDict):
     # 导购任务
     task: ShoppingSubTask
     # 子图消息
-    subgraph_messages: Annotated[list[BaseMessage], add_messages]  # 子图的消息
+    subgraph_messages: Annotated[list[BaseMessage], merge_subgraph_messages]  # 子图的消息
     # 每次搜索后的结果
     searched_res: Annotated[list[PageResult[list[ProductResponseDto]]], merge_searched_res]
     # 搜到到的商品详情
@@ -220,6 +225,9 @@ class SearchingSubgraphState(TypedDict):
 
     # 当前搜索循环次数，用于控制分页上限
     search_count_loop: int
+
+    # 当前工具循环次数，用于控制 ready_node → tool_node 循环上限
+    tool_loop: int
 
     # 父子图的同名 key 是共享的
     messages: Annotated[list[BaseMessage], add_messages]      # 父图的消息
